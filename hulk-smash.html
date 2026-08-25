@@ -291,7 +291,7 @@
     <div id="skills">
       <div class="skill chip" id="sk-punch"><span class="key">Z</span><div class="name">주먹</div><div class="cd"></div><span class="lv"></span></div>
       <div class="skill chip locked" id="sk-slam"><span class="key">X</span><div class="name">메테오</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
-      <div class="skill chip locked" id="sk-clap"><span class="key">C</span><div class="name">낙뢰</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
+      <div class="skill chip locked" id="sk-clap"><span class="key">C</span><div class="name">합장박수</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip locked" id="sk-dash"><span class="key">V</span><div class="name">혜성돌진</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip locked" id="sk-rage"><span class="key">R</span><div class="name">분노</div><div id="rageFill"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip hidden" id="sk-quake"><span class="key">Q</span><div class="name">퀘이크</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
@@ -309,7 +309,7 @@
     <div class="tbtn" id="tJump">점프</div>
     <div class="tbtn" id="tPunch">주먹!<span class="lv"></span></div>
     <div class="tbtn tskill locked" id="tSlam">메테오<span class="tcd"></span><span class="lv"></span></div>
-    <div class="tbtn tskill locked" id="tClap">낙뢰<span class="tcd"></span><span class="lv"></span></div>
+    <div class="tbtn tskill locked" id="tClap">박수<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill locked" id="tDash">혜성<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill locked" id="tRage">분노<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill hidden" id="tQuake">퀘이크<span class="tcd"></span><span class="lv"></span></div>
@@ -327,7 +327,7 @@
         <span class="kb">↑</span><span>점프</span>
         <span class="kb">Z / SPACE</span><span>주먹 연타 — 꾹 누르면 잽·훅·해머 콤보</span>
         <span class="kb locked">X</span><span class="locked-row">메테오 슬램 — STAGE 2 해제</span>
-        <span class="kb locked">C</span><span class="locked-row">낙뢰 박수 — STAGE 3 해제</span>
+        <span class="kb locked">C</span><span class="locked-row">합장 박수 — STAGE 3 해제</span>
         <span class="kb locked">V</span><span class="locked-row">혜성 돌진 — STAGE 4 해제</span>
         <span class="kb locked">R</span><span class="locked-row">분노 폭발 — STAGE 5 해제</span>
         <span class="kb locked">Q·E·F</span><span class="locked-row">보스 격파 보상 스킬</span>
@@ -1882,21 +1882,23 @@ function doClap(){
   if (!hasSkill('clap') || H.clapCd > 0 || H.clapT > 0 || H.slam || H.dashT > 0) return;
   H.clapT = 0.5; H.clapCd = 4.5;
   const dir = H.face;
+  /* 합장 박수: 전방을 통째로 날려버리는 폭풍 파면 */
   G.waves.push({
     x: H.x + dir * hulkW() * 0.6,
     dir, traveled: 0,
-    range: 560 + G.stage * 40,
-    speed: 1150,
+    range: 620 + G.stage * 40,
+    speed: 1500,
     id: Math.random(),
-    dmg: Math.ceil(power() * 1.6) * (G.rageT > 0 ? 2 : 1),
+    dmg: Math.max(2, Math.ceil(power() * 2.2)) * (G.rageT > 0 ? 2 : 1),
+    blast: true,
   });
-  /* 전방 경로에 낙뢰 연격 (강화 시 +1발) */
-  const nBolts = 3 + G.upgrades.clap;
-  for (let i = 0; i < nBolts; i++) {
-    G.pendingBolts.push({ x: H.x + dir * (170 + i * 160 + rand(-30, 30)), delay: 0.12 + i * 0.1 });
-  }
+  addRing(H.x + dir * 80, GROUND - hulkH() * 0.55, 170, '#c8ecff', 7);
+  addBurst(H.x + dir * hulkW() * 0.7, GROUND - hulkH() * 0.6, 62);
+  spawnDust(H.x + dir * 120, GROUND, 10, 90);
   SND.clap();
-  shake(10);
+  shake(14);
+  impact(0.05);
+  zoomKick(0.04);
   popup(H.x + dir * 90, GROUND - hulkH() - 30, 'THUNDER CLAP!!', 32, '#39a9db');
 }
 function doDash(){
@@ -2288,8 +2290,27 @@ function update(dt){
       if (o.hp <= 0 || o.lastWave === w.id) continue;
       if (o.x < hi && o.x + o.w > lo) {
         o.lastWave = w.id;
+        const oType = o.type;
         damageObj(o, w.dmg, clamp(front, o.x, o.x + o.w), true);
+        /* 합장 박수: 파괴된 잔해를 더 세게 날려버림 */
+        if (w.blast && o.hp <= 0 && G.wrecks.length) {
+          const wk = G.wrecks[G.wrecks.length - 1];
+          if (wk.type === oType) {
+            wk.vx = w.dir * Math.abs(wk.vx) * 1.6;
+            wk.vy *= 1.35;
+            wk.vr *= 1.4;
+          }
+        }
       }
+    }
+    if (w.blast && !reducedMotion && G.particles.length < 320) {
+      /* 강풍 스트릭 */
+      G.particles.push({
+        x: front - w.dir * rand(0, 60), y: GROUND - rand(10, 130),
+        vx: w.dir * rand(300, 550), vy: rand(-30, 30),
+        size: rand(8, 15), color: '', rot: 0, vr: 0,
+        t: 0, life: rand(0.15, 0.3), type: 'dust',
+      });
     }
     hitZombies(lo - 15, hi + 15, w.dir);
     if (!w.fromBoss) hitBoss(lo, hi, w.dmg, w.id, 'lastWave');
@@ -2529,7 +2550,7 @@ function setCd(name, cd, max){
 }
 
 /* ---------- 클리어 ---------- */
-const SKILL_NAMES = { slam: '메테오 슬램 (X)', clap: '낙뢰 박수 (C)', dash: '혜성 돌진 (V)', rage: '분노 폭발 (R)' };
+const SKILL_NAMES = { slam: '메테오 슬램 (X)', clap: '합장 박수 (C)', dash: '혜성 돌진 (V)', rage: '분노 폭발 (R)' };
 /* 보스 보상: 직접 쓰는 액티브 스킬 (중복 선택 시 레벨업) */
 const ACTIVES = [
   { key: 'quake', name: '어스퀘이크', kb: 'Q', desc: '땅을 내리찍어\n화면 전체를 분쇄' },
@@ -2951,7 +2972,8 @@ function render(){
   /* 충격 파면 (박수: 파랑 / 슬램 여진: 황금) */
   for (const w of G.waves) {
     const front = w.x + w.dir * w.traveled;
-    const wg2 = ctx.createRadialGradient(front, GROUND - 40, 5, front, GROUND - 40, 80);
+    const tall = w.blast ? 130 : (w.gold ? 46 : 78);
+    const wg2 = ctx.createRadialGradient(front, GROUND - tall * 0.5, 5, front, GROUND - tall * 0.5, tall);
     if (w.gold) {
       wg2.addColorStop(0, 'rgba(255,235,170,.7)');
       wg2.addColorStop(1, 'rgba(255,170,50,0)');
@@ -2961,8 +2983,22 @@ function render(){
     }
     ctx.fillStyle = wg2;
     ctx.beginPath();
-    ctx.ellipse(front, GROUND - 40, 30, w.gold ? 46 : 78, 0, 0, 7);
+    ctx.ellipse(front, GROUND - tall * 0.5, w.blast ? 44 : 30, tall, 0, 0, 7);
     ctx.fill();
+    if (w.blast) {
+      /* 강풍 줄무늬 */
+      ctx.save();
+      ctx.strokeStyle = 'rgba(230,245,255,.5)';
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 3; i++) {
+        const yy = GROUND - 30 - i * 45;
+        ctx.beginPath();
+        ctx.moveTo(front - w.dir * (60 + i * 40), yy);
+        ctx.lineTo(front - w.dir * 10, yy);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   /* 낙뢰 */
