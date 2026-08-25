@@ -1547,7 +1547,7 @@ function hitBoss(lo, hi, dmg, srcId, srcField){
   impact(0.05);
   shake(6);
   SND.clank();
-  if (hasSkill('rage') && G.rageT <= 0) G.rage = clamp(G.rage + 2 * (1 + 0.25 * G.upgrades.rage), 0, 100);
+  if (hasSkill('rage') && G.rageT <= 0) G.rage = clamp(G.rage + 3 * (1 + 0.25 * G.upgrades.rage), 0, 100);
   if (b.hp <= 0) {
     b.hp = 0;
     b.state = 'dying';
@@ -1902,6 +1902,8 @@ function damageObj(o, dmg, hitX, big){
     impact(0.05);
     G.camKick += dir * 9;
     zoomKick(0.02);
+    /* 때리는 중에도 분노가 차오름 */
+    if (hasSkill('rage') && G.rageT <= 0) G.rage = clamp(G.rage + 1.5, 0, 100);
     if (o.type === 'building') SND.glass(); else SND.crash();
     shake(7);
   } else {
@@ -1978,7 +1980,7 @@ function destroyObj(o, big){
 
   /* 분노 게이지 */
   if (hasSkill('rage') && G.rageT <= 0) {
-    G.rage = clamp(G.rage + (isBig ? 9 : 5) * (1 + 0.25 * G.upgrades.rage), 0, 100);
+    G.rage = clamp(G.rage + (isBig ? 14 : 8) * (1 + 0.25 * G.upgrades.rage), 0, 100);
   }
   updateHUD();
 
