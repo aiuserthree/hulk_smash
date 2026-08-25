@@ -681,7 +681,7 @@ const SND = {
 
 /* ---------- 배경음악 (절차 생성 록 루프) ---------- */
 const BGM = {
-  playing: false, step: 0, nextT: 0, timer: null, vol: 0.2,
+  playing: false, step: 0, nextT: 0, timer: null, vol: 0.24,
   start(){
     if (!AC || this.playing) return;
     this.playing = true;
@@ -694,7 +694,7 @@ const BGM = {
   full(){ if (AC) bgmBus.gain.setTargetAtTime(this.vol, AC.currentTime, 0.25); },
   tick(){
     if (!this.playing) return;
-    const spb = 60 / (G.rageT > 0 ? 126 : 116) / 4; /* 16분음표 */
+    const spb = 60 / (G.rageT > 0 ? 122 : 108) / 4; /* 16분음표 — 무겁고 웅장하게 */
     /* 백그라운드 탭에서 돌아온 직후 밀린 노트 몰아치기 방지 */
     if (this.nextT < AC.currentTime - 0.1) this.nextT = AC.currentTime + 0.05;
     while (this.nextT < AC.currentTime + 0.25) {
@@ -746,29 +746,98 @@ const BGM = {
     }
   },
   RIFF: [[0,0],[3,0],[4,3],[6,0],[8,7],[10,5],[12,3],[14,-2]],
+  /* 에픽 코드 진행: Em → C → G → D (키 루트 기준 반음) */
+  PROG: [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]],
+  PROGROOT: [0, -4, 3, -2],
+  /* 스트링 패드: 느린 어택 서스테인 코드 */
+  pad(t, semis, dur){
+    const root = 82.4 * Math.pow(2, (G.theme.key || 0) / 12) * 2;
+    for (const sm of semis) {
+      const f = root * Math.pow(2, sm / 12);
+      for (const det of [0.996, 1.004]) {
+        const o = AC.createOscillator(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(f * det, t);
+        const fl = AC.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 900;
+        const g = AC.createGain();
+        g.gain.setValueAtTime(0.001, t);
+        g.gain.linearRampToValueAtTime(0.034, t + 0.35);
+        g.gain.setValueAtTime(0.034, t + dur * 0.7);
+        g.gain.linearRampToValueAtTime(0.001, t + dur);
+        o.connect(fl); fl.connect(g); g.connect(bgmBus);
+        o.start(t); o.stop(t + dur + 0.05);
+      }
+    }
+  },
+  /* 트레일러 혼 스탭 */
+  horn(t, semis, dur, base){
+    for (const sm of semis) {
+      const f = base * 2 * Math.pow(2, sm / 12);
+      for (const det of [0.994, 1, 1.006]) {
+        const o = AC.createOscillator(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(f * det, t);
+        const fl = AC.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 1500;
+        const g = AC.createGain();
+        g.gain.setValueAtTime(0.001, t);
+        g.gain.linearRampToValueAtTime(0.05, t + 0.06);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        o.connect(fl); fl.connect(g); g.connect(bgmBus);
+        o.start(t); o.stop(t + dur + 0.05);
+      }
+    }
+  },
+  /* 팀파니 강타 */
+  timp(t){
+    const o = AC.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(88, t);
+    o.frequency.exponentialRampToValueAtTime(28, t + 0.4);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0.7, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+    o.connect(g); g.connect(bgmBus);
+    o.start(t); o.stop(t + 0.6);
+    const src = AC.createBufferSource(); src.buffer = noiseBuf(0.35);
+    const fl = AC.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 180;
+    const g2 = AC.createGain();
+    g2.gain.setValueAtTime(0.35, t);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    src.connect(fl); fl.connect(g2); g2.connect(bgmBus);
+    src.start(t);
+  },
+  /* 심벌 스웰 (루프 전환부 고조) */
+  swell(t, dur){
+    const src = AC.createBufferSource(); src.buffer = noiseBuf(dur + 0.05);
+    const fl = AC.createBiquadFilter(); fl.type = 'highpass'; fl.frequency.value = 5200;
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(0.13, t + dur * 0.92);
+    g.gain.linearRampToValueAtTime(0.001, t + dur);
+    src.connect(fl); fl.connect(g); g.connect(bgmBus);
+    src.start(t);
+  },
   schedule(step, t, spb){
     if (muted) return; /* 음소거 중엔 노드 생성 생략 (박자는 계속 진행) */
     const raging = G.rageT > 0;
     const bar = Math.floor(step / 16), s16 = step % 16;
-    /* 드럼 */
+    const root = 82.4 * Math.pow(2, (G.theme.key || 0) / 12);
+    const barRoot = root * Math.pow(2, this.PROGROOT[bar] / 12);
+    /* 드럼 + 팀파니 */
+    if (s16 === 0) this.timp(t);
     if (s16 === 0 || s16 === 8 || (bar === 3 && s16 === 14)) this.drum(t, 'kick');
     if (s16 === 4 || s16 === 12) this.drum(t, 'snare');
     if (raging || step % 2 === 0) this.drum(t, s16 === 6 ? 'open' : 'hat');
-    /* 베이스 리프 (스테이지 테마별 이조) */
-    const root = 82.4 * Math.pow(2, (G.theme.key || 0) / 12);
+    /* 스트링 패드: 마디마다 코드 체인지 */
+    if (s16 === 0) this.pad(t, this.PROG[bar], spb * 16);
+    /* 혼 스탭 */
+    if ((bar === 0 || bar === 2) && s16 === 0) this.horn(t, [0, 7, 12], spb * 10, barRoot);
+    if (raging && (bar === 1 || bar === 3) && s16 === 8) this.horn(t, [0, 7], spb * 6, barRoot);
+    /* 심벌 스웰 → 다음 루프 머리로 고조 */
+    if (bar === 3 && s16 === 8) this.swell(t, spb * 8);
+    /* 베이스 리프 (코드 루트를 따라 이동) */
     const hit = this.RIFF.find(rf => rf[0] === s16);
     if (hit) {
-      const f = root * Math.pow(2, hit[1] / 12);
-      this.n(t, f, spb * 2.6, 'sawtooth', 0.32, 520);
+      const f = barRoot * Math.pow(2, hit[1] / 12);
+      this.n(t, f, spb * 2.6, 'sawtooth', 0.3, 520);
       if (raging) this.n(t, f * 2, spb * 2.2, 'square', 0.09, 900);
-    }
-    /* 파워코드 스탭 (2마디마다) */
-    if ((bar === 0 || bar === 2) && s16 === 0) {
-      [0, 7, 12].forEach(sm => {
-        const f = root * 2 * Math.pow(2, sm / 12);
-        this.n(t, f * 1.004, spb * 6, 'sawtooth', 0.055, 1100);
-        this.n(t, f * 0.996, spb * 6, 'sawtooth', 0.055, 1100);
-      });
     }
   },
 };
