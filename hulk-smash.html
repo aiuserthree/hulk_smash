@@ -86,6 +86,12 @@
     position:absolute;left:0;bottom:0;width:100%;height:0%;
     background:rgba(22,22,31,.45);pointer-events:none;
   }
+  .skill .cdt{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:"Black Han Sans",sans-serif;font-size:19px;color:#fff;
+    text-shadow:0 1px 4px rgba(0,0,0,.9);pointer-events:none;
+  }
+  .skill .cdt:empty{display:none}
   .skill.ready-flash{animation:readyPop .3s}
   @keyframes readyPop{50%{transform:scale(1.15) rotate(-1deg)}}
   #rageFill{
@@ -209,6 +215,12 @@
   #tDash {right:142px;bottom:172px}
   #tRage {right:198px;bottom:192px}
   .tbtn.locked{opacity:.3;pointer-events:none}
+  .tbtn .tcd{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    border-radius:50%;background:rgba(22,22,31,.55);
+    font-size:14px;color:#ffd23f;pointer-events:none;
+  }
+  .tbtn .tcd:empty{display:none}
   body.touchmode #skills{display:none}
   body.touchmode #muteBtn{left:auto;bottom:auto;top:88px;right:14px}
   body.touchmode #pauseBtn{left:auto;bottom:auto;top:88px;right:62px}
@@ -232,10 +244,10 @@
 
     <div id="skills">
       <div class="skill chip" id="sk-punch"><span class="key">Z</span><div class="name">주먹</div><div class="cd"></div></div>
-      <div class="skill chip locked" id="sk-slam"><span class="key">X</span><div class="name">메테오</div><div class="cd"></div></div>
-      <div class="skill chip locked" id="sk-clap"><span class="key">C</span><div class="name">낙뢰</div><div class="cd"></div></div>
-      <div class="skill chip locked" id="sk-dash"><span class="key">V</span><div class="name">혜성돌진</div><div class="cd"></div></div>
-      <div class="skill chip locked" id="sk-rage"><span class="key">R</span><div class="name">분노</div><div id="rageFill"></div></div>
+      <div class="skill chip locked" id="sk-slam"><span class="key">X</span><div class="name">메테오</div><div class="cd"></div><div class="cdt"></div></div>
+      <div class="skill chip locked" id="sk-clap"><span class="key">C</span><div class="name">낙뢰</div><div class="cd"></div><div class="cdt"></div></div>
+      <div class="skill chip locked" id="sk-dash"><span class="key">V</span><div class="name">혜성돌진</div><div class="cd"></div><div class="cdt"></div></div>
+      <div class="skill chip locked" id="sk-rage"><span class="key">R</span><div class="name">분노</div><div id="rageFill"></div><div class="cdt"></div></div>
     </div>
     <div id="muteBtn" class="chip" title="소리 켜기/끄기 (M)">🔊</div>
     <div id="pauseBtn" class="chip" title="일시정지 (P)">⏸</div>
@@ -247,10 +259,10 @@
     <div class="tbtn" id="tRight">▶</div>
     <div class="tbtn" id="tJump">점프</div>
     <div class="tbtn" id="tPunch">주먹!</div>
-    <div class="tbtn tskill locked" id="tSlam">메테오</div>
-    <div class="tbtn tskill locked" id="tClap">낙뢰</div>
-    <div class="tbtn tskill locked" id="tDash">혜성</div>
-    <div class="tbtn tskill locked" id="tRage">분노</div>
+    <div class="tbtn tskill locked" id="tSlam">메테오<span class="tcd"></span></div>
+    <div class="tbtn tskill locked" id="tClap">낙뢰<span class="tcd"></span></div>
+    <div class="tbtn tskill locked" id="tDash">혜성<span class="tcd"></span></div>
+    <div class="tbtn tskill locked" id="tRage">분노<span class="tcd"></span></div>
   </div>
 
   <!-- 시작 화면 -->
@@ -763,6 +775,7 @@ const G = {
   skyCols: null,
   rage: 0,               // 0~100 게이지
   rageT: 0,              // 남은 분노 시간
+  rageRamp: 0,           // 변신 팽창 애니메이션 0~1
   clearT: 0,
   time: 0,
   camX: 0,
@@ -782,7 +795,8 @@ const H = {
   rageTick: 0,
   baseH: 128, baseW: 78,
 };
-function hulkScale(){ return 1 + Math.min(G.stage - 1, 9) * 0.11; }
+/* 분노 변신 시 덩치 35% 팽창 */
+function hulkScale(){ return (1 + Math.min(G.stage - 1, 9) * 0.11) * (1 + 0.35 * G.rageRamp); }
 function hulkH(){ return H.baseH * hulkScale(); }
 function hulkW(){ return H.baseW * hulkScale(); }
 function power(){ return 2 + Math.floor((G.stage - 1) * 1.2); }
@@ -928,7 +942,7 @@ function genStage(n){
   G.hitStop = 0; G.slowMo = 0; G.camKick = 0; G.zoomKick = 0;
   G.destroyed = 0; G.stageScore = 0; G.stageDestroyed = 0;
   G.combo = 0; G.comboT = 0; G.maxCombo = 0;
-  G.rageT = 0; G.clearT = 0;
+  G.rageT = 0; G.rageRamp = 0; G.clearT = 0;
 
   const pool = stageTypePool(n);
   let x = 420;
@@ -995,7 +1009,7 @@ function startGame(){
   SND.roar();
   BGM.start();
   BGM.full();
-  popup(H.x, GROUND - 240, '헐크 스매쉬!!', 46, '#4cbb4f');
+  popup(H.x, GROUND - 240, 'HULK SMASH!!', 46, '#4cbb4f');
 }
 function nextStage(){
   G.stage++;
@@ -1009,9 +1023,7 @@ function nextStage(){
 }
 
 /* ---------- 팝업 / 파티클 ---------- */
-const HIT_WORDS = ['퍽!', '빡!', '쾅!', '퍽퍽!'];
-const BREAK_WORDS = ['콰직!', '우지끈!', '펑!', '와장창!'];
-const BIG_WORDS = ['콰쾅!!', '우르르 쾅!!', '쿠구궁!!'];
+/* 타격 피드백은 데미지 숫자·점수로 표시 */
 function popup(x, y, text, size, color){
   G.popups.push({ x, y, text, size, color, t: 0, rot: rand(-0.18, 0.18), vy: rand(-60, -110) });
   if (G.popups.length > 24) G.popups.shift();
@@ -1141,8 +1153,7 @@ function hitZombies(lo, hi, dir){
     n++;
     const gain = addScore(60);
     bumpCombo();
-    popup(z.x, GROUND - z.h - 22, pick(['퍽!', '으악!', '털썩!']), 24, '#c9e6a0');
-    popup(z.x + rand(-20, 20), GROUND - z.h - 55, '+' + gain, 17, '#fff8e7');
+    popup(z.x + rand(-16, 16), GROUND - z.h - 30, '+' + gain, 21, '#c9e6a0');
     spawnDust(z.x, GROUND - z.h * 0.4, 2, 14);
     spawnSparks(z.x, GROUND - z.h * 0.6, d, 3);
     if (G.rageT > 0) G.rageT = Math.min(G.rageT + 0.12, 10);
@@ -1227,7 +1238,7 @@ function damageObj(o, dmg, hitX, big){
   const topY = GROUND - o.h;
   if (o.hp > 0) {
     const dir = (o.x + o.w / 2) >= H.x ? 1 : -1;
-    popup(hitX, topY - rand(6, 40), pick(HIT_WORDS), 30 + Math.min(dmg * 2, 18), '#fff8e7');
+    popup(hitX, topY - rand(6, 40), '-' + dmg, 26 + Math.min(dmg * 1.5, 18), '#ffde6a');
     addBurst(hitX, GROUND - Math.min(o.h * 0.5, 85), 34 + Math.min(dmg * 3, 26));
     spawnSparks(hitX, GROUND - Math.min(o.h * 0.45, 75), dir, 9);
     spawnDebris(o.x, GROUND, o.w, o.h, objDebrisColor(o), 10, 280, dir);
@@ -1262,9 +1273,8 @@ function destroyObj(o, big){
   const dir = cx >= H.x ? 1 : -1;
 
   const isBig = T.big;
-  popup(cx, topY - 30, isBig ? pick(BIG_WORDS) : pick(BREAK_WORDS), isBig ? 54 : 38, '#ffd23f');
-  popup(cx + rand(-40, 40), topY - 100, '+' + gain, 24, '#fff8e7');
-  if (G.combo >= 3) popup(H.x, GROUND - hulkH() - 60, G.combo + ' 연속 파괴!', 28 + Math.min(G.combo * 1.5, 30), '#ff4b33');
+  popup(cx + rand(-20, 20), topY - 50, '+' + gain, isBig ? 38 : 27, '#fff8e7');
+  if (G.combo >= 3) popup(H.x, GROUND - hulkH() - 60, 'COMBO x' + G.combo + '!', 28 + Math.min(G.combo * 1.5, 30), '#ff4b33');
 
   addBurst(cx, GROUND - Math.min(o.h * 0.55, 110), isBig ? 110 : 64);
   spawnSparks(cx, GROUND - Math.min(o.h * 0.4, 80), dir, isBig ? 20 : 12);
@@ -1376,7 +1386,7 @@ function doSlam(){
   H.vy = -1000;
   H.vx = H.face * 180;
   SND.jump();
-  popup(H.x, GROUND - hulkH() - 40, '메테오 슬램!!', 30, '#ffd23f');
+  popup(H.x, GROUND - hulkH() - 40, 'METEOR SLAM!!', 30, '#ffd23f');
 }
 function slamImpact(){
   const r = (230 + G.stage * 15) * (G.rageT > 0 ? 1.3 : 1);
@@ -1422,14 +1432,14 @@ function doClap(){
   }
   SND.clap();
   shake(10);
-  popup(H.x + dir * 90, GROUND - hulkH() - 30, '낙뢰 박수!!', 32, '#39a9db');
+  popup(H.x + dir * 90, GROUND - hulkH() - 30, 'THUNDER CLAP!!', 32, '#39a9db');
 }
 function doDash(){
   if (!hasSkill('dash') || H.dashCd > 0 || H.dashT > 0 || H.slam || H.clapT > 0) return;
   H.dashT = 0.5; H.dashCd = 5;
   H.dashId = Math.random();
   SND.dash(); SND.roar();
-  popup(H.x, GROUND - hulkH() - 40, '혜성 돌진!!!', 32, '#9fe36a');
+  popup(H.x, GROUND - hulkH() - 40, 'COMET DASH!!!', 32, '#9fe36a');
 }
 function doRage(){
   if (!hasSkill('rage') || G.rage < 100 || G.rageT > 0) return;
@@ -1439,7 +1449,7 @@ function doRage(){
   zoomKick(0.1);
   G.flash = 0.2;
   addRing(H.x, GROUND - hulkH() / 2, 380, '#ff4b33', 10);
-  popup(H.x, GROUND - hulkH() - 80, '헐크 스매쉬!!!!', 52, '#ff4b33');
+  popup(H.x, GROUND - hulkH() - 80, 'HULK SMASH!!!!', 52, '#ff4b33');
   /* 좀비 떼 습격 */
   spawnHorde(12 + Math.min(G.stage * 2, 14));
   popup(H.x, GROUND - hulkH() - 140, '좀비 떼가 몰려온다!!', 30, '#9fe36a');
@@ -1479,6 +1489,7 @@ function update(dt){
   H.clapT = Math.max(0, H.clapT - dt);
 
   if (G.rageT > 0) G.rageT = Math.max(0, G.rageT - dt);
+  G.rageRamp += ((G.rageT > 0 ? 1 : 0) - G.rageRamp) * Math.min(1, dt * 6);
 
   /* 콤보 타이머 */
   if (G.comboT > 0) { G.comboT -= dt; if (G.comboT <= 0) G.combo = 0; }
@@ -1828,16 +1839,37 @@ function updateSkillLocks(){
   }
 }
 function updateSkillCds(){
-  setCd('punch', H.punchCd, 0.24);
+  setCd('punch', H.punchCd, 0.32);
   setCd('slam', H.slamCd, 2.6);
   setCd('clap', H.clapCd, 4.5);
   setCd('dash', H.dashCd, 5);
   ui.rageFill.style.height = (G.rageT > 0 ? 100 : G.rage) + '%';
   ui.skills.rage.classList.toggle('rage-ready', hasSkill('rage') && (G.rage >= 100 || G.rageT > 0));
+  /* 분노: 게이지 % 또는 남은 지속시간 */
+  let rtext = '';
+  if (hasSkill('rage')) {
+    if (G.rageT > 0) rtext = G.rageT.toFixed(1);
+    else if (G.rage < 100) rtext = Math.floor(G.rage) + '%';
+  }
+  const rc = ui.skills.rage.querySelector('.cdt');
+  if (rc && rc.textContent !== rtext) rc.textContent = rtext;
+  const rt = ui.tskills.rage.querySelector('.tcd');
+  if (rt && rt.textContent !== rtext) rt.textContent = rtext;
 }
 function setCd(name, cd, max){
-  const el = ui.skills[name].querySelector('.cd');
+  const chip = ui.skills[name];
+  const el = chip.querySelector('.cd');
   if (el) el.style.height = (cd / max * 100) + '%';
+  /* 남은 초 표시 (짧은 주먹 쿨타임은 제외) */
+  if (name === 'punch') return;
+  const txt = cd > 0.05 ? cd.toFixed(1) : '';
+  const ct = chip.querySelector('.cdt');
+  if (ct && ct.textContent !== txt) ct.textContent = txt;
+  const tb = ui.tskills[name];
+  if (tb) {
+    const tt = tb.querySelector('.tcd');
+    if (tt && tt.textContent !== txt) tt.textContent = txt;
+  }
 }
 
 /* ---------- 클리어 ---------- */
@@ -2872,9 +2904,9 @@ function drawHulk(){
   const clapPh = clapping ? (0.5 - H.clapT) / 0.5 : 0;
   const dashing = H.dashT > 0;
 
-  /* 무비풍 올리브 그린 5톤 */
+  /* 무비풍 올리브 그린 5톤 — 분노 변신 시 붉은 폭주 형태 */
   const P = raging
-    ? { hi:'#c3e06a', base:'#94b447', mid:'#719030', dark:'#527020', deep:'#365014' }
+    ? { hi:'#ff9d6e', base:'#d9553a', mid:'#a83c28', dark:'#7a2a1c', deep:'#521c12' }
     : { hi:'#aecb64', base:'#7c9f45', mid:'#5f7f31', dark:'#42601f', deep:'#2e4416' };
   const skinF = [[0, P.hi], [0.42, P.base], [1, P.dark]];
   const skinB = [[0, P.base], [0.42, P.mid], [1, P.deep]];
@@ -3215,7 +3247,7 @@ function drawHulk(){
     ctx.stroke();
     ctx.restore();
     /* 눈 */
-    ctx.fillStyle = raging ? '#ff5040' : '#e9f2d4';
+    ctx.fillStyle = raging ? '#ffe089' : '#e9f2d4';
     ctx.beginPath();
     ctx.arc(hx + headR * 0.58, hy + headR * 0.04 + browDrop * 0.5, headR * 0.12, 0, 7);
     ctx.fill();
