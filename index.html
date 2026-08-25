@@ -4511,11 +4511,11 @@ function drawHulk(){
   /* 무비풍 올리브 그린 5톤 — 분노 변신 시 붉은 폭주 형태 */
   const P = raging
     ? { hi:'#ff9d6e', base:'#d9553a', mid:'#a83c28', dark:'#7a2a1c', deep:'#521c12' }
-    : { hi:'#aecb64', base:'#7c9f45', mid:'#5f7f31', dark:'#42601f', deep:'#2e4416' };
+    : { hi:'#b2e56c', base:'#65c148', mid:'#419e34', dark:'#2c7c25', deep:'#1d5619' };
   const skinF = [[0, P.hi], [0.42, P.base], [1, P.dark]];
   const skinB = [[0, P.base], [0.42, P.mid], [1, P.deep]];
-  const jeanF = [[0, '#5c6375'], [0.5, '#464d5d'], [1, '#30353f']];
-  const jeanB = [[0, '#454b59'], [0.5, '#343947'], [1, '#23262e']];
+  const jeanF = [[0, '#3f4a72'], [0.5, '#2c3456'], [1, '#1d2440']];
+  const jeanB = [[0, '#2c3456'], [0.5, '#232a48'], [1, '#171d34']];
   const outline = 'rgba(20,28,10,.5)';
   const defLine = 'rgba(46,68,22,.5)'; /* 근육 정의선 */
   const outW = 2.2 * Math.min(s, 1.4);
@@ -4647,10 +4647,23 @@ function drawHulk(){
     ctx.lineTo(ax - anR * 0.85, ay + anR * 0.85);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
+    /* 발가락 골 */
+    if (front) {
+      ctx.save();
+      ctx.strokeStyle = defLine;
+      ctx.lineWidth = outW * 0.45;
+      for (let i = 1; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(ax + bodyW * 0.3 - i * 7 * s, ay - anR * 0.35);
+        ctx.lineTo(ax + bodyW * 0.28 - i * 7 * s, ay + anR * 0.6);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     /* 허벅지 청바지 */
     limbG(hx, hy, kx, ky, thR, knR * 1.25, front ? jeanF : jeanB);
     /* 찢어진 밑단 */
-    ctx.fillStyle = front ? '#464d5d' : '#343947';
+    ctx.fillStyle = front ? '#2c3456' : '#232a48';
     const fx = (r, d) => kx + Math.sin(sA) * d + Math.cos(sA) * r;
     const fy = (r, d) => ky + Math.cos(sA) * d - Math.sin(sA) * r;
     ctx.beginPath();
@@ -4661,6 +4674,21 @@ function drawHulk(){
     ctx.lineTo(fx(knR * 1.2, 0), fy(knR * 1.2, 0));
     ctx.closePath();
     ctx.fill();
+    /* 찢김 사이 초록 발광 (레퍼런스 룩) */
+    if (front && !H.slam) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(120,255,110,.5)';
+      ctx.lineWidth = outW * 0.8;
+      const mx2 = (hx + kx) / 2, my2 = (hy + ky) / 2;
+      ctx.beginPath();
+      ctx.moveTo(mx2 - thR * 0.4, my2 - thighL * 0.1);
+      ctx.lineTo(mx2 + thR * 0.25, my2 + thighL * 0.02);
+      ctx.moveTo(mx2 - thR * 0.15, my2 + thighL * 0.18);
+      ctx.lineTo(mx2 + thR * 0.4, my2 + thighL * 0.28);
+      ctx.stroke();
+      ctx.restore();
+    }
     /* 종아리 근육선 */
     if (front) {
       ctx.save();
@@ -4696,6 +4724,55 @@ function drawHulk(){
     if (raging && !moving) return front ? [0.8, 1.7, 1] : [-0.7, 1.6, 1];
     if (moving) return front ? [0.35 - swing * 0.85, 1.15, 1] : [0.35 + swing * 0.85, 1.15, 1]; /* 러닝: 굽힌 팔 펌핑 */
     return front ? [0.3, 0.36, 1] : [-0.38, 0.32, 1];
+  }
+  /* 각진 주먹: 너클 4개 스캘럽 + 손가락 마디선 + 감긴 엄지 */
+  function drawFist(x, y, canvasAng, r, front){
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(canvasAng);
+    const L = r * 2.1, Hh = r * 1.7;
+    const g = ctx.createLinearGradient(0, -Hh * 0.5, 0, Hh * 0.5);
+    g.addColorStop(0, front ? P.base : P.mid);
+    g.addColorStop(0.6, front ? P.mid : P.dark);
+    g.addColorStop(1, front ? P.dark : P.deep);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-L * 0.42, -Hh * 0.38);
+    ctx.quadraticCurveTo(-L * 0.1, -Hh * 0.54, L * 0.22, -Hh * 0.48);
+    for (let i = 0; i < 4; i++) {
+      const y0 = -Hh * 0.48 + i * (Hh * 0.92 / 4);
+      const y1 = y0 + Hh * 0.92 / 4;
+      ctx.quadraticCurveTo(L * 0.56, (y0 + y1) / 2, L * 0.3, y1);
+    }
+    ctx.quadraticCurveTo(-L * 0.05, Hh * 0.54, -L * 0.42, Hh * 0.4);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    /* 손가락 마디선 */
+    ctx.save();
+    ctx.strokeStyle = defLine;
+    ctx.lineWidth = outW * 0.5;
+    for (let i = 1; i < 4; i++) {
+      const yy = -Hh * 0.48 + i * (Hh * 0.92 / 4);
+      ctx.beginPath();
+      ctx.moveTo(L * 0.3, yy);
+      ctx.quadraticCurveTo(L * 0.04, yy * 0.85, -L * 0.16, yy * 0.8);
+      ctx.stroke();
+    }
+    ctx.restore();
+    /* 엄지 */
+    if (front) {
+      const tg2 = ctx.createLinearGradient(0, 0, 0, Hh * 0.55);
+      tg2.addColorStop(0, P.base);
+      tg2.addColorStop(1, P.dark);
+      ctx.fillStyle = tg2;
+      ctx.beginPath();
+      ctx.moveTo(-L * 0.18, Hh * 0.1);
+      ctx.quadraticCurveTo(L * 0.24, Hh * 0.16, L * 0.16, Hh * 0.4);
+      ctx.quadraticCurveTo(L * 0.02, Hh * 0.58, -L * 0.24, Hh * 0.44);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
   }
   function deltoid(front, shX, shY){
     const dR = bodyW * (front ? 0.2 : 0.18);
@@ -4744,26 +4821,10 @@ function drawHulk(){
       ctx.stroke();
       ctx.restore();
     }
-    /* 주먹 */
-    const fiR = bodyW * (front ? 0.21 : 0.19);
-    const fcx = wx + Math.sin(aF) * fiR * 0.5, fcy = wy + Math.cos(aF) * fiR * 0.5;
-    const fg = ctx.createRadialGradient(fcx + fiR * 0.3, fcy - fiR * 0.35, fiR * 0.15, fcx, fcy, fiR);
-    fg.addColorStop(0, front ? P.base : P.mid);
-    fg.addColorStop(1, front ? P.dark : P.deep);
-    ctx.fillStyle = fg;
-    ctx.beginPath(); ctx.arc(fcx, fcy, fiR, 0, 7); ctx.fill(); ctx.stroke();
-    if (front) {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(20,28,10,.4)';
-      ctx.lineWidth = outW * 0.55;
-      const ka = Math.atan2(Math.cos(aF), Math.sin(aF));
-      for (let i = -1; i <= 1; i++) {
-        ctx.beginPath();
-        ctx.arc(fcx, fcy, fiR * 0.72, ka - 0.5 + i * 0.42, ka - 0.15 + i * 0.42);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
+    /* 각진 주먹 */
+    const fiR = bodyW * (front ? 0.2 : 0.18);
+    const fcx = wx + Math.sin(aF) * fiR * 0.55, fcy = wy + Math.cos(aF) * fiR * 0.55;
+    drawFist(fcx, fcy, Math.atan2(Math.cos(aF), Math.sin(aF)), fiR, front);
     /* 휘두르는 팔 잔상 */
     const puncher = punchPh > 0 && !hammering && ((pSeq === 0 && front) || (pSeq === 1 && !front));
     if (puncher && punchPh > 0.2) {
@@ -4815,21 +4876,36 @@ function drawHulk(){
     limbG(shX, shY, ex, ey, uR * 1.2, uR, sk);
     limbG(ex, ey, hx3, hy3, fR, wR, sk);
     deltoid(front, shX, shY);
-    /* 손: 합장은 손바닥, 해머는 주먹 */
-    const fiR = bodyW * (front ? 0.21 : 0.19);
+    /* 손: 합장은 손바닥(손가락 골), 해머는 각진 주먹 */
+    const fiR = bodyW * (front ? 0.2 : 0.18);
     const ha = Math.atan2(hy3 - ey, hx3 - ex);
-    ctx.save();
-    ctx.translate(hx3, hy3);
-    ctx.rotate(ha);
-    const fg = ctx.createRadialGradient(0, -fiR * 0.3, fiR * 0.15, 0, 0, fiR);
-    fg.addColorStop(0, front ? P.base : P.mid);
-    fg.addColorStop(1, front ? P.dark : P.deep);
-    ctx.fillStyle = fg;
-    ctx.beginPath();
-    if (palm) ctx.roundRect(-fiR * 0.4, -fiR * 0.95, fiR * 1.5, fiR * 1.9, fiR * 0.45);
-    else ctx.arc(fiR * 0.4, 0, fiR, 0, 7);
-    ctx.fill(); ctx.stroke();
-    ctx.restore();
+    if (palm) {
+      ctx.save();
+      ctx.translate(hx3, hy3);
+      ctx.rotate(ha);
+      const fg = ctx.createRadialGradient(0, -fiR * 0.3, fiR * 0.15, 0, 0, fiR);
+      fg.addColorStop(0, front ? P.base : P.mid);
+      fg.addColorStop(1, front ? P.dark : P.deep);
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.roundRect(-fiR * 0.4, -fiR * 0.95, fiR * 1.5, fiR * 1.9, fiR * 0.45);
+      ctx.fill(); ctx.stroke();
+      /* 손가락 골 */
+      ctx.save();
+      ctx.strokeStyle = defLine;
+      ctx.lineWidth = outW * 0.45;
+      for (let i = 1; i < 4; i++) {
+        const yy = -fiR * 0.95 + i * (fiR * 1.9 / 4);
+        ctx.beginPath();
+        ctx.moveTo(fiR * 0.2, yy);
+        ctx.lineTo(fiR * 1.02, yy);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.restore();
+    } else {
+      drawFist(hx3 + Math.cos(ha) * fiR * 0.5, hy3 + Math.sin(ha) * fiR * 0.5, ha, fiR, front);
+    }
     return [hx3, hy3];
   }
 
@@ -4977,21 +5053,38 @@ function drawHulk(){
     ctx.quadraticCurveTo(-bodyW * 0.1, yTrap - torsoH * 0.03, bodyW * 0.15, yTrap + torsoH * 0.04);
     ctx.stroke();
     ctx.restore();
-    /* 청바지 허리춤 */
-    const wg = ctx.createLinearGradient(0, yHip - 9 * s, 0, yHip + 7 * s);
-    wg.addColorStop(0, '#525a6c');
-    wg.addColorStop(1, '#31363f');
+    /* 퍼플 새시 + 테크 벨트 (발광 그린 코어) */
+    ctx.fillStyle = '#6a4fa5';
+    ctx.beginPath();
+    ctx.roundRect(-hw * 1.12, yHip - 12 * s, hw * 2.24, 8 * s, 3 * s);
+    ctx.fill(); ctx.stroke();
+    const wg = ctx.createLinearGradient(0, yHip - 5 * s, 0, yHip + 8 * s);
+    wg.addColorStop(0, '#4a5064');
+    wg.addColorStop(1, '#262b3a');
     ctx.fillStyle = wg;
     ctx.beginPath();
-    ctx.roundRect(-hw * 1.14, yHip - 9 * s, hw * 2.28, 16 * s, 4 * s);
+    ctx.roundRect(-hw * 1.14, yHip - 5 * s, hw * 2.28, 13 * s, 4 * s);
+    ctx.fill(); ctx.stroke();
+    /* 사이드 포드 */
+    ctx.fillStyle = '#5a6274';
+    ctx.beginPath();
+    ctx.roundRect(-hw * 0.72, yHip - 6.5 * s, 12 * s, 15 * s, 3 * s);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.roundRect(hw * 0.55, yHip - 6.5 * s, 12 * s, 15 * s, 3 * s);
+    ctx.fill(); ctx.stroke();
+    /* 버클 + 발광 코어 */
+    ctx.fillStyle = '#8a93a6';
+    ctx.beginPath();
+    ctx.roundRect(bodyW * 0.04 - 12 * s, yHip - 8 * s, 24 * s, 18 * s, 5 * s);
     ctx.fill(); ctx.stroke();
     ctx.save();
-    ctx.strokeStyle = 'rgba(20,24,32,.6)';
-    ctx.lineWidth = outW * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(-hw * 1.05, yHip - 2.5 * s);
-    ctx.lineTo(hw * 1.05, yHip - 2.5 * s);
-    ctx.stroke();
+    ctx.globalCompositeOperation = 'lighter';
+    const bkc = ctx.createRadialGradient(bodyW * 0.04, yHip + 1 * s, 1, bodyW * 0.04, yHip + 1 * s, 9 * s);
+    bkc.addColorStop(0, 'rgba(150,255,120,.95)');
+    bkc.addColorStop(1, 'rgba(60,200,60,0)');
+    ctx.fillStyle = bkc;
+    ctx.fillRect(bodyW * 0.04 - 10 * s, yHip - 9 * s, 20 * s, 20 * s);
     ctx.restore();
   }
 
@@ -5020,25 +5113,24 @@ function drawHulk(){
     ctx.beginPath();
     ctx.arc(hx - headR * 0.52, hy + headR * 0.18, headR * 0.19, 0, 7);
     ctx.fill();
-    /* 머리카락 */
-    ctx.fillStyle = '#221d19';
+    /* 검은 플랫탑 헤어 */
+    ctx.fillStyle = '#1b1815';
     ctx.beginPath();
-    ctx.moveTo(hx + headR * 0.8, hy - headR * 0.48);
-    ctx.lineTo(hx + headR * 0.5, hy - headR * 0.26);
-    ctx.lineTo(hx + headR * 0.42, hy - headR * 0.6);
-    ctx.lineTo(hx + headR * 0.12, hy - headR * 0.4);
-    ctx.quadraticCurveTo(hx - headR * 0.42, hy - headR * 0.58, hx - headR * 0.62, hy - headR * 0.24);
-    ctx.lineTo(hx - headR * 0.88, hy + headR * 0.3);
-    ctx.quadraticCurveTo(hx - headR * 1.02, hy - headR * 0.62, hx - headR * 0.36, hy - headR * 1.0);
-    ctx.quadraticCurveTo(hx + headR * 0.34, hy - headR * 1.22, hx + headR * 0.8, hy - headR * 0.48);
+    ctx.moveTo(hx + headR * 0.7, hy - headR * 0.52);
+    ctx.lineTo(hx + headR * 0.62, hy - headR * 1.12);
+    ctx.lineTo(hx - headR * 0.72, hy - headR * 1.18);
+    ctx.lineTo(hx - headR * 0.92, hy - headR * 0.2);
+    ctx.lineTo(hx - headR * 0.62, hy - headR * 0.32);
+    ctx.quadraticCurveTo(hx - headR * 0.1, hy - headR * 0.58, hx + headR * 0.4, hy - headR * 0.58);
     ctx.closePath();
     ctx.fill();
+    /* 플랫탑 윗면 하이라이트 */
     ctx.save();
-    ctx.strokeStyle = 'rgba(120,105,90,.35)';
+    ctx.strokeStyle = 'rgba(110,100,90,.4)';
     ctx.lineWidth = outW * 0.5;
     ctx.beginPath();
-    ctx.moveTo(hx - headR * 0.55, hy - headR * 0.72);
-    ctx.quadraticCurveTo(hx - headR * 0.05, hy - headR * 0.98, hx + headR * 0.42, hy - headR * 0.7);
+    ctx.moveTo(hx - headR * 0.66, hy - headR * 1.1);
+    ctx.lineTo(hx + headR * 0.56, hy - headR * 1.05);
     ctx.stroke();
     ctx.restore();
     /* 눈두덩 그림자 */
