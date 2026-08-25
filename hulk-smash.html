@@ -594,6 +594,12 @@ const SND = {
     pNoise({dur:0.09, type:'bandpass', f0:700, vol:0.35});
     pTone({type:'sine', f0:230, f1:55, dur:0.11, vol:0.28});
   },
+  clank(){
+    const r = rand(0.9, 1.15);
+    pTone({type:'square', f0:420*r, f1:150, dur:0.08, vol:0.22});
+    pNoise({dur:0.08, type:'bandpass', f0:2400*r, vol:0.3});
+    pTone({type:'sine', f0:150*r, f1:48, dur:0.13, vol:0.45});
+  },
   punchHeavy(){
     const r = rand(0.92, 1.1);
     pTone({type:'sine', f0:130*r, f1:24, dur:0.24, vol:1.0, dist:true});
@@ -771,11 +777,14 @@ const G = {
   pendingBolts: [],
   zombies: [],
   zombieSpawnT: 0,
+  boss: null,
+  bossDefeated: false,
   stars: null,
   skyCols: null,
   rage: 0,               // 0~100 게이지
   rageT: 0,              // 남은 분노 시간
   rageRamp: 0,           // 변신 팽창 애니메이션 0~1
+  rageGrinT: 0,          // 변신 직후 씩 웃는 표정
   clearT: 0,
   time: 0,
   camX: 0,
@@ -790,6 +799,8 @@ const H = {
   punchSeq: 0, punchChainT: 0, punchDur: 0.2,
   slam: 0,               // 0 없음 / 1 도약 / 2 낙하
   slamCd: 0,
+  knockT: 0, knockVx: 0, // 보스에게 밀려나는 중
+  landT: 0,              // 착지 크라우치 연출
   clapT: 0, clapCd: 0,
   dashT: 0, dashCd: 0,
   rageTick: 0,
@@ -875,6 +886,7 @@ bindTap('tRage', 'rage');
 const $ = id => document.getElementById(id);
 const ui = {
   hud: $('hud'), stageNum: $('stageNum'), progressFill: $('progressFill'),
+  progressWord: document.querySelector('#progressLabel span'),
   progressCount: $('progressCount'), scoreVal: $('scoreVal'), scoreBox: $('scoreBox'),
   startOv: $('startOv'), clearOv: $('clearOv'), pauseOv: $('pauseOv'),
   clearSub: $('clearSub'), stDestroyed: $('stDestroyed'), stCombo: $('stCombo'),
@@ -967,6 +979,24 @@ function genStage(n){
   }
   G.total = G.objects.length;
 
+  /* 5스테이지마다 보스전: 사물 없는 아레나에서 1:1 결투 */
+  G.boss = null; G.bossDefeated = false;
+  if (n % 5 === 0) {
+    G.objects = [];
+    G.total = 0;
+    G.worldLen = 1900;
+    const bhp = 90 + n * 30;
+    G.boss = {
+      x: 1500, face: -1, w: 170, h: 300,
+      hp: bhp, maxHp: bhp,
+      state: 'enter', t: 0, stateT: 0,
+      hitFlash: 0, attackCd: 2.5,
+      lastWave: -1, lastDash: -1, hitHulk: false,
+      chargeDir: -1, dieT: 0, rot: 0, walkT: 0,
+    };
+    popup(1100, GROUND - 380, 'BOSS!!', 64, '#ff4b33');
+  }
+
   /* 배경 스카이라인 3층 (원경→근경) */
   G.skyline = [[], [], []];
   const layerScale = [0.6, 0.9, 1.25];
@@ -993,6 +1023,7 @@ function genStage(n){
   H.onGround = true; H.punchT = 0; H.slam = 0; H.clapT = 0; H.dashT = 0;
   H.punchCd = 0; H.slamCd = 0; H.clapCd = 0; H.dashCd = 0;
   H.punchSeq = 0; H.punchChainT = 0;
+  H.knockT = 0; H.knockVx = 0; H.landT = 0;
   G.camX = 0;
   updateHUD();
   updateSkillLocks();
@@ -1120,6 +1151,21 @@ function spawnShards(x, y, count){
     t: 0, life: rand(0.5, 0.9), type: 'shard',
   });
 }
+/* 피 분수 (좀비 처치) */
+function spawnBlood(x, y, dir, count){
+  const n = Math.min(count, 340 - G.particles.length);
+  for (let i = 0; i < n; i++) {
+    G.particles.push({
+      x: x + rand(-8, 8), y: y - rand(0, 14),
+      vx: dir * rand(40, 420) + rand(-90, 90),
+      vy: -rand(40, 330),
+      size: rand(2.5, 5), color: pick(['#a8232a', '#8a1c22', '#c22e30']),
+      rot: 0, vr: 0, t: 0, life: rand(1.4, 2.4),
+      type: 'blood', grounded: false,
+    });
+  }
+}
+
 /* ---------- 좀비 떼 (분노 모드 전용 보너스 먹잇감) ---------- */
 function spawnZombie(side){
   if (G.zombies.length >= 26) return;
@@ -1154,8 +1200,8 @@ function hitZombies(lo, hi, dir){
     const gain = addScore(60);
     bumpCombo();
     popup(z.x + rand(-16, 16), GROUND - z.h - 30, '+' + gain, 21, '#c9e6a0');
+    spawnBlood(z.x, GROUND - z.h * 0.55, d, 11);
     spawnDust(z.x, GROUND - z.h * 0.4, 2, 14);
-    spawnSparks(z.x, GROUND - z.h * 0.6, d, 3);
     if (G.rageT > 0) G.rageT = Math.min(G.rageT + 0.12, 10);
   }
   if (n) {
@@ -1164,6 +1210,163 @@ function hitZombies(lo, hi, dir){
     updateHUD();
   }
   return n;
+}
+
+/* ---------- 보스 (5스테이지마다 1:1 결투) ---------- */
+function hulkKnock(dir){
+  H.knockT = 0.35;
+  H.knockVx = dir * 640;
+  if (H.onGround) { H.vy = -330; H.onGround = false; }
+  G.combo = 0; G.comboT = 0;
+  popup(H.x, GROUND - hulkH() - 50, '휘청!!', 30, '#ff8a5a');
+  shake(12);
+  impact(0.05);
+  SND.crash();
+}
+/* 범위·데미지로 보스 타격. srcField로 파동/돌진 중복 타격 방지 */
+function hitBoss(lo, hi, dmg, srcId, srcField){
+  const b = G.boss;
+  if (!b || b.state === 'dying') return false;
+  if (b.x + b.w / 2 < lo || b.x - b.w / 2 > hi) return false;
+  if (srcField) {
+    if (b[srcField] === srcId) return false;
+    b[srcField] = srcId;
+  }
+  const mult = b.state === 'stunned' ? 2 : 1;
+  const dealt = dmg * mult;
+  b.hp -= dealt;
+  b.hitFlash = 0.12;
+  popup(b.x + rand(-40, 40), GROUND - b.h + rand(10, 70), '-' + dealt,
+        26 + Math.min(dealt, 20), mult > 1 ? '#ff8a3c' : '#ffde6a');
+  spawnSparks(b.x - b.face * b.w * 0.3, GROUND - rand(70, 170), -b.face, 7);
+  addBurst(b.x - b.face * b.w * 0.25, GROUND - rand(80, 160), 42);
+  impact(0.05);
+  shake(6);
+  SND.clank();
+  if (hasSkill('rage') && G.rageT <= 0) G.rage = clamp(G.rage + 2, 0, 100);
+  if (b.hp <= 0) {
+    b.hp = 0;
+    b.state = 'dying';
+    b.dieT = 0;
+    SND.roar();
+  }
+  updateHUD();
+  return true;
+}
+function updateBoss(dt){
+  const b = G.boss;
+  b.t += dt;
+  if (b.hitFlash > 0) b.hitFlash -= dt;
+  const dx = H.x - b.x;
+  if (b.state !== 'charge' && b.state !== 'dying') b.face = dx < 0 ? -1 : 1;
+  /* 파손 연출 */
+  const ratio = b.hp / b.maxHp;
+  if (!reducedMotion && b.state !== 'dying' && G.particles.length < 300) {
+    if (ratio < 0.66 && Math.random() < dt * 4) G.particles.push({
+      x: b.x + rand(-50, 50), y: GROUND - b.h * rand(0.5, 0.85),
+      vx: rand(-15, 15), vy: -rand(40, 100),
+      size: rand(9, 16), color: '', rot: 0, vr: 0, t: 0, life: rand(0.7, 1.2), type: 'smoke',
+    });
+    if (ratio < 0.33 && Math.random() < dt * 5) G.particles.push({
+      x: b.x + rand(-40, 40), y: GROUND - b.h * rand(0.4, 0.7),
+      vx: rand(-15, 15), vy: -rand(30, 80),
+      size: rand(8, 14), color: '', rot: 0, vr: 0, t: 0, life: rand(0.2, 0.45), type: 'fire',
+    });
+  }
+  switch (b.state) {
+    case 'enter':
+      b.x -= 60 * dt;
+      b.walkT += dt * 4;
+      if (b.x <= 1400) b.state = 'walk';
+      break;
+    case 'walk': {
+      b.attackCd -= dt;
+      const adx = Math.abs(dx);
+      if (adx > 180) {
+        b.x += Math.sign(dx) * 65 * dt;
+        b.walkT += dt * 4;
+        if (Math.random() < dt * 1.6) { SND.step(); shake(1.5); }
+      }
+      if (b.attackCd <= 0) {
+        if (adx < 280) { b.state = 'windup'; b.stateT = 0.6; }
+        else { b.state = 'chargePrep'; b.stateT = 0.65; }
+      }
+      break;
+    }
+    case 'windup':
+      b.stateT -= dt;
+      if (b.stateT <= 0) {
+        /* 스톰프: 점프로 회피 가능 */
+        b.state = 'recover'; b.stateT = 0.9;
+        const fx2 = b.x + b.face * 60;
+        addRing(fx2, GROUND, 280, '#ffd23f', 8);
+        addCrack(fx2, 200);
+        spawnDust(fx2, GROUND, 16, 140);
+        shake(20); impact(0.06);
+        SND.land(); SND.boom();
+        for (const d of [1, -1]) G.waves.push({
+          x: fx2, dir: d, traveled: 20, range: 340, speed: 700,
+          id: Math.random(), dmg: 1, gold: true, fromBoss: true,
+        });
+        if (H.onGround && Math.abs(H.x - fx2) < 300) hulkKnock(Math.sign(H.x - fx2) || -b.face);
+        b.attackCd = rand(2.4, 3.4);
+      }
+      break;
+    case 'chargePrep':
+      b.stateT -= dt;
+      if (b.stateT <= 0) {
+        b.state = 'charge'; b.stateT = 1.1;
+        b.chargeDir = b.face; b.hitHulk = false;
+        SND.dash();
+      }
+      break;
+    case 'charge':
+      b.stateT -= dt;
+      b.x += b.chargeDir * 640 * dt;
+      b.x = clamp(b.x, 130, G.worldLen - 130);
+      b.walkT += dt * 10;
+      if (!reducedMotion && Math.random() < 0.7) spawnDust(b.x - b.chargeDir * 70, GROUND, 1, 40);
+      if (!b.hitHulk && H.onGround && Math.abs(H.x - b.x) < 110) {
+        b.hitHulk = true;
+        hulkKnock(b.chargeDir);
+      }
+      if (b.stateT <= 0 || b.x <= 131 || b.x >= G.worldLen - 131) {
+        b.state = 'stunned'; b.stateT = 1.4; /* 그로기: 2배 데미지 찬스 */
+        spawnSparks(b.x, GROUND - 120, -b.chargeDir, 9);
+        popup(b.x, GROUND - b.h - 60, '그로기!', 26, '#ffd23f');
+        SND.crash();
+      }
+      break;
+    case 'recover':
+    case 'stunned':
+      b.stateT -= dt;
+      if (b.stateT <= 0) { b.state = 'walk'; b.attackCd = Math.max(b.attackCd, 0.9); }
+      break;
+    case 'dying':
+      b.dieT += dt;
+      b.rot = Math.min(1.35, b.dieT * 1.1);
+      if (b.dieT % 0.28 < dt && G.particles.length < 320) {
+        fireball(b.x + rand(-70, 70), GROUND - rand(60, 240), false);
+        SND.crash();
+        shake(6);
+      }
+      if (b.dieT > 2.0 && !G.bossDefeated) {
+        G.bossDefeated = true;
+        fireball(b.x, GROUND - 80, true);
+        addScorch(b.x, 220);
+        addRubble(b.x, 200);
+        SND.bigBoom(); shake(30); zoomKick(0.09); G.flash = 0.2;
+        if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.35;
+        const gain = addScore(5000);
+        popup(b.x, GROUND - 260, '+' + gain, 42, '#fff8e7');
+        popup(H.x, GROUND - hulkH() - 90, '보스 격파!!', 46, '#4cbb4f');
+        SND.roar();
+        G.boss = null;
+        G.state = 'clearing';
+        G.clearT = 1.3;
+      }
+      break;
+  }
 }
 
 /* 낙뢰 (하늘에서 번개 내리꽂기) */
@@ -1182,6 +1385,7 @@ function spawnBolt(x){
     damageObj(o, dmg, clamp(x, o.x, o.x + o.w), true);
   }
   hitZombies(x - 75, x + 75, 0);
+  hitBoss(x - 75, x + 75, dmg);
   addBurst(x, GROUND - 30, 72);
   spawnSparks(x, GROUND - 18, 1, 6);
   spawnSparks(x, GROUND - 18, -1, 6);
@@ -1326,7 +1530,7 @@ function destroyObj(o, big){
   }
   updateHUD();
 
-  if (G.destroyed >= G.total && G.state === 'play') {
+  if (G.total > 0 && G.destroyed >= G.total && G.state === 'play' && !G.boss) {
     G.state = 'clearing';
     G.clearT = 1.15;
     SND.roar();
@@ -1358,10 +1562,11 @@ function doPunch(){
   const range = (heavy ? 84 : 60) * hulkScale() + G.stage * 6;
   const [a, b] = frontHitbox(range);
   const targets = objectsInRange(a, b);
+  const dmg = power() * (heavy ? 2 : 1) * (G.rageT > 0 ? 2 : 1);
   if (heavy) SND.punchHeavy(); else SND.punch();
-  hitZombies(a, b, H.face);
-  if (targets.length) {
-    const dmg = power() * (heavy ? 2 : 1) * (G.rageT > 0 ? 2 : 1);
+  const zk = hitZombies(a, b, H.face);
+  const bossHit = hitBoss(a, b, dmg);
+  if (targets.length || bossHit) {
     for (const o of targets) damageObj(o, dmg, clamp(H.x + H.face * (hulkW() / 2 + 34), o.x, o.x + o.w));
     shake(heavy ? 9 : 5);
     if (heavy) {
@@ -1371,13 +1576,22 @@ function doPunch(){
       zoomKick(0.05);
       shake(13);
     }
-  } else {
+  } else if (!zk) {
     SND.whoosh();
   }
 }
 function doJump(){
   if (!H.onGround || H.slam) return;
-  H.vy = -760; H.onGround = false;
+  /* 헐크식 거대 도약 — 착지 반동 타이밍에 다시 뛰면 슈퍼 도약 */
+  const springboard = H.landT > 0;
+  H.vy = springboard ? -1250 : -1020;
+  H.onGround = false;
+  H.landT = 0;
+  spawnDust(H.x, GROUND, springboard ? 10 : 6, springboard ? 55 : 40);
+  if (springboard) {
+    popup(H.x, GROUND - hulkH() - 40, 'LEAP!', 26, '#9fe36a');
+    addRing(H.x, GROUND, 70, '#fff8e7', 4);
+  }
   SND.jump();
 }
 function doSlam(){
@@ -1393,6 +1607,7 @@ function slamImpact(){
   const dmg = power() * 2 * (G.rageT > 0 ? 2 : 1);
   for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
   hitZombies(H.x - r, H.x + r, 0);
+  hitBoss(H.x - r, H.x + r, dmg);
   addRing(H.x, GROUND, r, '#ffd23f', 8);
   addRing(H.x, GROUND, r * 0.55, '#fff8e7', 5);
   addBurst(H.x, GROUND - 28, 90);
@@ -1444,6 +1659,7 @@ function doDash(){
 function doRage(){
   if (!hasSkill('rage') || G.rage < 100 || G.rageT > 0) return;
   G.rage = 0; G.rageT = 8;
+  G.rageGrinT = 0.9; /* "헐크… 스매쉬" — 씩 웃기 */
   SND.roar(); SND.bigBoom();
   shake(26);
   zoomKick(0.1);
@@ -1490,13 +1706,18 @@ function update(dt){
 
   if (G.rageT > 0) G.rageT = Math.max(0, G.rageT - dt);
   G.rageRamp += ((G.rageT > 0 ? 1 : 0) - G.rageRamp) * Math.min(1, dt * 6);
+  if (G.rageGrinT > 0) G.rageGrinT = Math.max(0, G.rageGrinT - dt);
 
   /* 콤보 타이머 */
   if (G.comboT > 0) { G.comboT -= dt; if (G.comboT <= 0) G.combo = 0; }
 
   /* 이동 */
   const spd = moveSpeed() * (G.rageT > 0 ? 1.35 : 1);
-  if (H.dashT > 0) {
+  if (H.knockT > 0) {
+    /* 보스에게 밀려나는 중 */
+    H.knockT -= dt;
+    H.vx = H.knockVx * Math.max(0, H.knockT / 0.35);
+  } else if (H.dashT > 0) {
     H.dashT -= dt;
     H.vx = H.face * 1500;
     /* 돌진 충돌 */
@@ -1507,6 +1728,7 @@ function update(dt){
       damageObj(o, power() * 3 * (G.rageT > 0 ? 2 : 1), o.x + o.w / 2, true);
     }
     hitZombies(H.x - hw - 20, H.x + hw + 20, H.face);
+    hitBoss(H.x - hw - 20, H.x + hw + 20, power() * 3 * (G.rageT > 0 ? 2 : 1), H.dashId, 'lastDash');
     /* 녹색 혜성 트레일 */
     if (!reducedMotion && G.particles.length < 320) {
       for (let i = 0; i < 2; i++) G.particles.push({
@@ -1524,6 +1746,7 @@ function update(dt){
       addRing(bx, GROUND - 30, 160, '#9fe36a', 7);
       const lo = Math.min(H.x, H.x + H.face * 240), hi = Math.max(H.x, H.x + H.face * 240);
       for (const o of objectsInRange(lo, hi)) damageObj(o, power(), o.x + o.w / 2, true);
+      hitBoss(lo, hi, power());
       SND.sonic();
       shake(9);
       impact(0.04);
@@ -1560,13 +1783,23 @@ function update(dt){
         t: 0, life: rand(0.2, 0.4), type: 'fire',
       });
     }
+    const fallSpeed = H.vy;
     H.y += H.vy * dt;
     if (H.y >= GROUND) {
       H.y = GROUND; H.vy = 0; H.onGround = true;
       if (H.slam === 2) { H.slam = 0; slamImpact(); }
-      else { SND.land(); spawnDust(H.x, GROUND, 5, 30); shake(3); }
+      else {
+        /* 착지: 낙하 속도에 비례한 크라우치와 충격 */
+        const hard = fallSpeed > 750;
+        H.landT = hard ? 0.26 : 0.16;
+        SND.land();
+        spawnDust(H.x, GROUND, hard ? 12 : 5, hard ? 60 : 30);
+        shake(hard ? 8 : 3);
+        if (hard) { addRing(H.x, GROUND, 90, '#fff8e7', 4); impact(0.03); }
+      }
     }
   }
+  if (H.landT > 0) H.landT = Math.max(0, H.landT - dt);
 
   /* 분노 접촉 파괴 + 불티 오라 */
   if (G.rageT > 0) {
@@ -1578,6 +1811,7 @@ function update(dt){
         damageObj(o, power() * 2, o.x + o.w / 2, true);
       }
       hitZombies(H.x - hw, H.x + hw, 0);
+      hitBoss(H.x - hw, H.x + hw, power() * 2);
     }
     if (!reducedMotion && G.particles.length < 320 && Math.random() < 0.55) {
       G.particles.push({
@@ -1588,6 +1822,9 @@ function update(dt){
       });
     }
   }
+
+  /* 보스 */
+  if (G.boss) updateBoss(dt);
 
   /* 좀비 떼 AI */
   if (G.rageT > 0) {
@@ -1669,6 +1906,7 @@ function update(dt){
       }
     }
     hitZombies(lo - 15, hi + 15, w.dir);
+    if (!w.fromBoss) hitBoss(lo, hi, w.dmg, w.id, 'lastWave');
     if (!reducedMotion) spawnDust(front, GROUND, 1, 12);
   }
   G.waves = G.waves.filter(w => w.traveled < w.range);
@@ -1688,6 +1926,12 @@ function update(dt){
     p.rot += p.vr * dt;
     if ((p.type === 'chunk' || p.type === 'shard') && p.y > GROUND) {
       p.y = GROUND; p.vy *= -0.35; p.vx *= 0.7;
+    }
+    /* 핏방울: 바닥에 닿으면 핏자국으로 남음 */
+    if (p.type === 'blood' && !p.grounded && p.y >= GROUND + 2) {
+      p.grounded = true;
+      p.y = GROUND + 3;
+      p.vx = 0; p.vy = 0;
     }
   }
   G.particles = G.particles.filter(p => p.t < p.life);
@@ -1827,8 +2071,17 @@ function flashReady(name){
 /* ---------- HUD ---------- */
 function updateHUD(){
   ui.stageNum.textContent = G.stage;
-  ui.progressCount.textContent = G.destroyed + ' / ' + G.total;
-  ui.progressFill.style.width = (G.total ? (G.destroyed / G.total * 100) : 0) + '%';
+  if (G.boss) {
+    ui.progressWord.textContent = 'BOSS';
+    ui.progressCount.textContent = Math.max(0, Math.ceil(G.boss.hp)) + ' / ' + G.boss.maxHp;
+    ui.progressFill.style.width = clamp(G.boss.hp / G.boss.maxHp * 100, 0, 100) + '%';
+    ui.progressFill.style.background = 'linear-gradient(90deg,#e03a2a,#ff8a3c)';
+  } else {
+    ui.progressWord.textContent = '파괴율';
+    ui.progressCount.textContent = G.destroyed + ' / ' + G.total;
+    ui.progressFill.style.width = (G.total ? (G.destroyed / G.total * 100) : 0) + '%';
+    ui.progressFill.style.background = '';
+  }
   ui.scoreVal.textContent = G.score.toLocaleString();
 }
 function updateSkillLocks(){
@@ -1878,7 +2131,7 @@ function showClear(){
   G.state = 'clear';
   SND.fanfare();
   BGM.duck(0.09);
-  ui.clearSub.textContent = 'STAGE ' + G.stage + ' — ' + G.theme.name + ' 클리어';
+  ui.clearSub.textContent = 'STAGE ' + G.stage + (G.bossDefeated ? ' — BOSS 격파!!' : ' — ' + G.theme.name + ' 클리어');
   ui.stDestroyed.textContent = G.stageDestroyed;
   ui.stCombo.textContent = G.maxCombo;
   ui.stScore.textContent = G.stageScore.toLocaleString();
@@ -2166,6 +2419,9 @@ function render(){
   }
   ctx.globalAlpha = 1;
 
+  /* 보스 */
+  if (G.boss) drawBoss(G.boss);
+
   /* 좀비 떼 */
   for (const z of G.zombies) {
     if (z.x < G.camX - 60 || z.x > G.camX + viewW + 60) continue;
@@ -2282,6 +2538,14 @@ function render(){
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, 7);
       ctx.fill();
+    } else if (p.type === 'blood') {
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.grounded ? 0.65 * lifeRatio : 0.9;
+      ctx.beginPath();
+      if (p.grounded) ctx.ellipse(p.x, GROUND + 3, p.size * 1.8, p.size * 0.4, 0, 0, 7);
+      else ctx.arc(p.x, p.y, p.size, 0, 7);
+      ctx.fill();
+      ctx.globalAlpha = 1;
     } else if (p.type === 'spark') {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -2800,6 +3064,139 @@ function drawObject(o){
   ctx.restore();
 }
 
+/* ---------- 보스 그리기 (거대 전투 메카) ---------- */
+function drawBoss(b){
+  ctx.save();
+  ctx.translate(b.x, GROUND);
+  /* 그림자 */
+  ctx.fillStyle = 'rgba(15,15,25,.3)';
+  ctx.beginPath();
+  ctx.ellipse(0, 4, b.w * 0.62, 11, 0, 0, 7);
+  ctx.fill();
+  ctx.scale(b.face, 1);
+  /* 상태별 자세 */
+  if (b.state === 'dying') ctx.rotate(-b.rot);
+  else if (b.state === 'charge') ctx.rotate(0.2);
+  else if (b.state === 'chargePrep') ctx.rotate(-0.1);
+  else if (b.state === 'stunned') ctx.rotate(Math.sin(b.t * 18) * 0.03 + 0.08);
+  const crouch = b.state === 'windup' ? (0.6 - b.stateT) / 0.6 * 20 : 0;
+  ctx.translate(0, crouch);
+  const bob = Math.sin(b.walkT) * 4;
+  const w = b.w, h = b.h;
+  ctx.strokeStyle = 'rgba(12,15,22,.55)';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3;
+  const metal = (x0, y0, x1, y1) => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, '#77836a');
+    g.addColorStop(0.5, '#586250');
+    g.addColorStop(1, '#333a2c');
+    return g;
+  };
+  /* 다리 */
+  for (const sx of [-1, 1]) {
+    const lx = sx * w * 0.27;
+    ctx.fillStyle = metal(lx - 20, 0, lx + 20, 0);
+    ctx.beginPath();
+    ctx.roundRect(lx - 19, -h * 0.5, 38, h * 0.5, 7);
+    ctx.fill(); ctx.stroke();
+    /* 무릎 장갑판 */
+    ctx.fillStyle = '#454e3a';
+    ctx.beginPath();
+    ctx.roundRect(lx - 23, -h * 0.28, 46, 26, 6);
+    ctx.fill(); ctx.stroke();
+    /* 발 */
+    ctx.fillStyle = '#3a4130';
+    ctx.beginPath();
+    ctx.roundRect(lx - 30, -14, 64, 14, 4);
+    ctx.fill(); ctx.stroke();
+  }
+  /* 몸통 */
+  const ty = -h * 0.5 - bob;
+  ctx.fillStyle = metal(-w / 2, ty - 120, w / 2, ty);
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.48, ty - h * 0.42, w * 0.96, h * 0.42, 12);
+  ctx.fill(); ctx.stroke();
+  /* 가슴 통풍구 */
+  ctx.save();
+  ctx.strokeStyle = 'rgba(12,15,22,.4)';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.1, ty - h * 0.34 + i * 13);
+    ctx.lineTo(w * 0.22, ty - h * 0.34 + i * 13);
+    ctx.stroke();
+  }
+  ctx.restore();
+  /* 코어 (발광) */
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const core = ctx.createRadialGradient(w * 0.06, ty - h * 0.2, 2, w * 0.06, ty - h * 0.2, 26);
+  const coreCol = b.state === 'windup' || b.state === 'chargePrep' ? '255,90,50' : '255,60,60';
+  core.addColorStop(0, 'rgba(' + coreCol + ',.95)');
+  core.addColorStop(1, 'rgba(' + coreCol + ',0)');
+  ctx.fillStyle = core;
+  ctx.fillRect(w * 0.06 - 26, ty - h * 0.2 - 26, 52, 52);
+  ctx.restore();
+  /* 어깨 장갑 */
+  ctx.fillStyle = '#4c553f';
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.62, ty - h * 0.44, w * 0.26, 34, 8);
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.roundRect(w * 0.38, ty - h * 0.44, w * 0.26, 34, 8);
+  ctx.fill(); ctx.stroke();
+  /* 앞팔: 거대 피스톤 주먹 (돌진 시 뻗음) */
+  const fistExt = b.state === 'charge' ? 46 : (b.state === 'chargePrep' ? -18 : 0);
+  ctx.fillStyle = metal(w * 0.4, 0, w * 0.75, 0);
+  ctx.beginPath();
+  ctx.roundRect(w * 0.42, ty - h * 0.34, 26, h * 0.26, 8);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#454e3a';
+  ctx.beginPath();
+  ctx.roundRect(w * 0.4 + fistExt, ty - h * 0.14, 46, 42, 9);
+  ctx.fill(); ctx.stroke();
+  /* 뒷팔: 캐논 */
+  ctx.fillStyle = '#3e4632';
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.6, ty - h * 0.3, 24, h * 0.2, 7);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#2e3426';
+  ctx.fillRect(-w * 0.58, ty - h * 0.32, 68, 15);
+  ctx.strokeRect(-w * 0.58, ty - h * 0.32, 68, 15);
+  /* 머리: 콕핏 + 붉은 바이저 */
+  ctx.fillStyle = metal(-22, ty - h * 0.42 - 30, 22, ty - h * 0.42);
+  ctx.beginPath();
+  ctx.roundRect(-20, ty - h * 0.42 - 30, 44, 32, 7);
+  ctx.fill(); ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = 'rgba(255,60,50,' + (0.65 + Math.sin(b.t * 6) * 0.25) + ')';
+  ctx.fillRect(-10, ty - h * 0.42 - 22, 30, 8);
+  ctx.restore();
+  /* 피격 플래시 */
+  if (b.hitFlash > 0) {
+    ctx.globalAlpha = Math.max(0, b.hitFlash * 6);
+    ctx.fillStyle = '#fff4dc';
+    ctx.fillRect(-w * 0.65, ty - h * 0.48 - 32, w * 1.3, h * 0.95);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  /* 머리 위 HP 바 */
+  if (b.state !== 'dying') {
+    const bw = 220, bx = b.x - bw / 2, by = GROUND - b.h - 46;
+    ctx.fillStyle = 'rgba(15,18,28,.6)';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, 12, 6); ctx.fill();
+    const hg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    hg.addColorStop(0, '#e03a2a');
+    hg.addColorStop(1, '#ff8a3c');
+    ctx.fillStyle = hg;
+    ctx.beginPath();
+    ctx.roundRect(bx + 2, by + 2, Math.max(4, (bw - 4) * clamp(b.hp / b.maxHp, 0, 1)), 8, 4);
+    ctx.fill();
+  }
+}
+
 /* ---------- 좀비 그리기 ---------- */
 function drawZombie(z){
   const launched = z.state === 'launched';
@@ -2937,19 +3334,25 @@ function drawHulk(){
   ctx.lineJoin = 'round';
   ctx.lineWidth = outW;
 
+  const rising = !H.onGround && H.vy < -100;
+  const landCr = H.landT > 0 ? H.landT / 0.26 : 0; /* 착지 크라우치 */
+
   /* 고릴라 체형: 다리 짧고 팔이 무릎까지 */
   const legH = bodyH * 0.42;
   const torsoH = bodyH * 0.47;
   const headR = bodyH * 0.095;
-  const hipY = -legH - bob * 0.4;
+  const hipY = -legH - bob * 0.4 + landCr * 15 * s; /* 착지 시 몸 낮춤 */
   const thighL = legH * 0.52, shinL = legH * 0.52;
 
   let lean = 0;
   if (dashing) lean = 0.3;
   else if (H.slam === 1) lean = -0.16;
   else if (H.slam === 2) lean = 0.2;
+  else if (rising) lean = -0.14;              /* 도약: 가슴 펴기 */
+  else if (!H.onGround) lean = 0.18;          /* 하강: 착지 준비 */
   else if (clapping) lean = 0.08;
-  else if (moving && H.onGround) lean = 0.1;
+  else if (moving && H.onGround) lean = 0.14;
+  lean += landCr * 0.24;
   if (punchPh > 0) lean += punchPh * (pSeq === 2 ? 0.2 : 0.12); /* 펀치 체중 싣기 */
   function rotated(fn){
     ctx.save();
@@ -2965,7 +3368,10 @@ function drawHulk(){
     let thA, knee;
     if (!H.onGround) {
       if (H.slam === 2) { thA = front ? 0.35 : -0.3; knee = 1.0; }
-      else { thA = front ? 0.55 : -0.45; knee = front ? 0.8 : 0.4; }
+      else if (rising) { thA = front ? 0.35 : -0.75; knee = front ? 0.55 : 0.25; } /* 도약: 다리 뒤로 참 */
+      else { thA = front ? 0.6 : -0.35; knee = front ? 0.9 : 0.5; }               /* 하강: 착지 준비 */
+    } else if (landCr > 0.2) {
+      thA = front ? 0.3 : -0.28; knee = 0.55 * landCr + 0.15; /* 착지 웅크림 */
     } else if (moving) {
       const amp = dashing ? 0.85 : 0.55;
       thA = amp * Math.sin(t2 + phase);
@@ -3020,7 +3426,11 @@ function drawHulk(){
     if (H.slam === 1) return [2.65, -0.2, 1];
     if (H.slam === 2) return [1.05, -0.1, 1];
     if (dashing) return front ? [0.3 + Math.sin(t2) * 0.8, 1.25, 1] : [0.3 - Math.sin(t2) * 0.8, 1.25, 1];
-    if (!H.onGround) return front ? [0.75, 0.8, 1] : [-0.55, 0.55, 1];
+    if (!H.onGround) {
+      if (rising) return front ? [-0.55, 0.45, 1] : [-0.95, 0.35, 1]; /* 도약: 팔 뒤로 젖힘 */
+      return front ? [1.15, 0.5, 1] : [0.55, 0.65, 1];                 /* 하강: 팔 앞으로 */
+    }
+    if (landCr > 0.2) return front ? [0.7, 0.85, 1] : [-0.45, 0.5, 1]; /* 착지: 손 바닥 짚기 */
     if (raging && !moving) return front ? [0.8, 1.7, 1] : [-0.7, 1.6, 1];
     if (moving) return front ? [0.3 - swing * 0.55, 0.45, 1] : [-0.35 + swing * 0.55, 0.42, 1];
     return front ? [0.3, 0.36, 1] : [-0.38, 0.32, 1];
@@ -3266,8 +3676,18 @@ function drawHulk(){
     ctx.lineTo(hx + headR * 0.97, hy + headR * 0.33);
     ctx.stroke();
     ctx.restore();
-    /* 입 */
-    if (attacking) {
+    /* 입: 평소엔 굳게 다묾, 공격 중엔 으르렁, 변신 직후엔 씩 웃음 */
+    if (G.rageGrinT > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(30,42,14,.9)';
+      ctx.lineWidth = outW * 0.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(hx + headR * 0.24, hy + headR * 0.52);
+      ctx.quadraticCurveTo(hx + headR * 0.6, hy + headR * 0.82, hx + headR * 0.92, hy + headR * 0.44);
+      ctx.stroke();
+      ctx.restore();
+    } else if (attacking) {
       ctx.fillStyle = '#2a1a0c';
       ctx.beginPath();
       ctx.roundRect(hx + headR * 0.28, hy + headR * 0.5, headR * 0.62, headR * 0.36, headR * 0.1);
