@@ -257,6 +257,8 @@
   #tQuake{right:58px; bottom:242px}
   #tThrow{right:114px;bottom:260px}
   #tRoar {right:170px;bottom:242px}
+  #tSpin {right:226px;bottom:260px}
+  #tStomp{right:282px;bottom:242px}
   .tbtn .tcd{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     border-radius:50%;background:rgba(22,22,31,.55);
@@ -297,6 +299,8 @@
       <div class="skill chip hidden" id="sk-quake"><span class="key">Q</span><div class="name">퀘이크</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip hidden" id="sk-throwSteel"><span class="key">E</span><div class="name">철골투척</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip hidden" id="sk-roar"><span class="key">F</span><div class="name">포효</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
+      <div class="skill chip hidden" id="sk-spin"><span class="key">T</span><div class="name">토네이도</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
+      <div class="skill chip hidden" id="sk-stomp"><span class="key">G</span><div class="name">스톰프</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
     </div>
     <div id="muteBtn" class="chip" title="소리 켜기/끄기 (M)">🔊</div>
     <div id="pauseBtn" class="chip" title="일시정지 (P)">⏸</div>
@@ -315,6 +319,8 @@
     <div class="tbtn tskill hidden" id="tQuake">퀘이크<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill hidden" id="tThrow">철골<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill hidden" id="tRoar">포효<span class="tcd"></span><span class="lv"></span></div>
+    <div class="tbtn tskill hidden" id="tSpin">회전<span class="tcd"></span><span class="lv"></span></div>
+    <div class="tbtn tskill hidden" id="tStomp">스톰프<span class="tcd"></span><span class="lv"></span></div>
   </div>
 
   <!-- 시작 화면 -->
@@ -330,7 +336,7 @@
         <span class="kb locked">C</span><span class="locked-row">합장 박수 — STAGE 3 해제</span>
         <span class="kb locked">V</span><span class="locked-row">혜성 돌진 — STAGE 4 해제</span>
         <span class="kb locked">R</span><span class="locked-row">분노 폭발 — STAGE 5 해제</span>
-        <span class="kb locked">Q·E·F</span><span class="locked-row">보스 격파 보상 스킬</span>
+        <span class="kb locked">Q·E·F·T·G</span><span class="locked-row">보스 격파 보상 스킬 (계속 누적!)</span>
       </div>
       <button class="bigbtn" id="startBtn">부수러 가기!</button>
       <div style="margin-top:14px;font-size:12px;font-weight:700;color:#8a8270">P 일시정지 · M 음소거</div>
@@ -846,7 +852,7 @@ const G = {
   projs: [],
   hurls: [],
   upgrades: { punch: 0, slam: 0, clap: 0, dash: 0, rage: 0, hp: 0, size: 0 },
-  actives: { quake: 0, throwSteel: 0, roar: 0 },
+  actives: { quake: 0, throwSteel: 0, roar: 0, spin: 0, stomp: 0 },
   stars: null,
   skyCols: null,
   rage: 0,               // 0~100 게이지
@@ -873,6 +879,8 @@ const H = {
   hp: 100, maxHp: 100,   // 보스 공격에만 깎임
   invulnT: 0,            // 피격 후 무적시간
   quakeCd: 0, throwCd: 0, roarCd: 0, roarT: 0, // 보상 액티브 스킬
+  spinT: 0, spinCd: 0, spinTick: 0,
+  stompN: 0, stompT: 0, stompCd: 0,
   clapT: 0, clapCd: 0,
   dashT: 0, dashCd: 0,
   rageTick: 0,
@@ -913,6 +921,8 @@ addEventListener('keydown', e => {
     case 'KeyQ': pressQueue.push('quake'); break;
     case 'KeyE': pressQueue.push('throwSteel'); break;
     case 'KeyF': pressQueue.push('roar'); break;
+    case 'KeyT': pressQueue.push('spin'); break;
+    case 'KeyG': pressQueue.push('stomp'); break;
     case 'KeyM': toggleMute(); break;
     case 'KeyP': case 'Escape': togglePause(); break;
   }
@@ -963,6 +973,8 @@ bindTap('tRage', 'rage');
 bindTap('tQuake', 'quake');
 bindTap('tThrow', 'throwSteel');
 bindTap('tRoar', 'roar');
+bindTap('tSpin', 'spin');
+bindTap('tStomp', 'stomp');
 
 /* ---------- UI 참조 ---------- */
 const $ = id => document.getElementById(id);
@@ -980,11 +992,13 @@ const ui = {
     punch: $('sk-punch'), slam: $('sk-slam'), clap: $('sk-clap'),
     dash: $('sk-dash'), rage: $('sk-rage'),
     quake: $('sk-quake'), throwSteel: $('sk-throwSteel'), roar: $('sk-roar'),
+    spin: $('sk-spin'), stomp: $('sk-stomp'),
   },
   rageFill: $('rageFill'),
   tskills: {
     slam: $('tSlam'), clap: $('tClap'), dash: $('tDash'), rage: $('tRage'),
     quake: $('tQuake'), throwSteel: $('tThrow'), roar: $('tRoar'),
+    spin: $('tSpin'), stomp: $('tStomp'),
   },
 };
 
@@ -1134,6 +1148,8 @@ function genStage(n){
   H.punchSeq = 0; H.punchChainT = 0;
   H.knockT = 0; H.knockVx = 0; H.landT = 0;
   H.quakeCd = 0; H.throwCd = 0; H.roarCd = 0; H.roarT = 0;
+  H.spinT = 0; H.spinCd = 0; H.spinTick = 0;
+  H.stompN = 0; H.stompT = 0; H.stompCd = 0;
   H.clapHit = false;
   H.maxHp = 100 + 25 * G.upgrades.hp;
   H.hp = H.maxHp; H.invulnT = 0; G.hurtT = 0;
@@ -1146,7 +1162,7 @@ function genStage(n){
 function startGame(){
   G.stage = 1; G.score = 0; G.rage = 0;
   G.upgrades = { punch: 0, slam: 0, clap: 0, dash: 0, rage: 0, hp: 0, size: 0 };
-  G.actives = { quake: 0, throwSteel: 0, roar: 0 };
+  G.actives = { quake: 0, throwSteel: 0, roar: 0, spin: 0, stomp: 0 };
   ui.startOv.classList.remove('on');
   ui.clearOv.classList.remove('on');
   ui.hud.classList.add('on');
@@ -2017,6 +2033,23 @@ function doRoar(){
   pTone({type:'sine', f0:70, f1:24, dur:0.6, vol:0.8, dist:true});
   popup(H.x, GROUND - hulkH() - 70, 'RRAAAGH!!', 42, '#c8ecff');
 }
+function doSpin(){
+  if (!G.actives.spin || H.spinCd > 0 || H.slam || H.clapT > 0 || H.dashT > 0) return;
+  const lv = G.actives.spin;
+  H.spinCd = 14 * Math.pow(0.85, lv - 1);
+  H.spinT = 1.6;
+  H.spinTick = 0;
+  SND.dash(); SND.roar();
+  popup(H.x, GROUND - hulkH() - 60, 'TORNADO!!', 36, '#9fe36a');
+}
+function doStomp(){
+  if (!G.actives.stomp || H.stompCd > 0 || H.stompN > 0 || H.slam || H.clapT > 0 || H.dashT > 0 || !H.onGround) return;
+  const lv = G.actives.stomp;
+  H.stompCd = 11 * Math.pow(0.85, lv - 1);
+  H.stompN = 3;
+  H.stompT = 0.05;
+  popup(H.x, GROUND - hulkH() - 60, 'GIGA STOMP!!', 36, '#ffd23f');
+}
 /* 철골 투사체: 경로 관통 + 착탄 대폭발 */
 function updateHurls(dt){
   for (const hu of G.hurls) {
@@ -2069,6 +2102,8 @@ function update(dt){
     else if (a === 'quake') doQuake();
     else if (a === 'throwSteel') doThrowSteel();
     else if (a === 'roar') doRoar();
+    else if (a === 'spin') doSpin();
+    else if (a === 'stomp') doStomp();
   }
   /* Z 꾹 누르면 무자비 연타 */
   if (G.state === 'play' && input.punch) doPunch();
@@ -2084,13 +2119,18 @@ function update(dt){
   if (wasClapCd > 0 && H.clapCd === 0) flashReady('clap');
   if (wasDashCd > 0 && H.dashCd === 0) flashReady('dash');
   const wasQ = H.quakeCd, wasT = H.throwCd, wasR = H.roarCd;
+  const wasS = H.spinCd, wasSt = H.stompCd;
   H.quakeCd = Math.max(0, H.quakeCd - dt);
   H.throwCd = Math.max(0, H.throwCd - dt);
   H.roarCd = Math.max(0, H.roarCd - dt);
+  H.spinCd = Math.max(0, H.spinCd - dt);
+  H.stompCd = Math.max(0, H.stompCd - dt);
   H.roarT = Math.max(0, H.roarT - dt);
   if (wasQ > 0 && H.quakeCd === 0) flashReady('quake');
   if (wasT > 0 && H.throwCd === 0) flashReady('throwSteel');
   if (wasR > 0 && H.roarCd === 0) flashReady('roar');
+  if (wasS > 0 && H.spinCd === 0) flashReady('spin');
+  if (wasSt > 0 && H.stompCd === 0) flashReady('stomp');
   H.punchT = Math.max(0, H.punchT - dt);
   H.punchChainT = Math.max(0, H.punchChainT - dt);
   H.clapT = Math.max(0, H.clapT - dt);
@@ -2292,6 +2332,57 @@ function update(dt){
     }
   }
   G.zombies = G.zombies.filter(z => !z.dead);
+
+  /* 토네이도 스핀 */
+  if (H.spinT > 0) {
+    H.spinT -= dt;
+    H.spinTick -= dt;
+    if (H.spinTick <= 0) {
+      H.spinTick = 0.12;
+      const lv = G.actives.spin;
+      const r = 170 + lv * 15;
+      const dmg = Math.max(1, Math.ceil(power() * 1.2 * (1 + 0.4 * (lv - 1)))) * (G.rageT > 0 ? 2 : 1);
+      for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
+      hitZombies(H.x - r, H.x + r, 0);
+      hitBoss(H.x - r, H.x + r, Math.max(1, Math.ceil(dmg * 0.6)));
+      shake(4);
+    }
+    if (!reducedMotion && G.particles.length < 320) {
+      G.particles.push({
+        x: H.x + rand(-70, 70), y: GROUND - rand(0, hulkH()),
+        vx: rand(-220, 220), vy: -rand(50, 160),
+        size: rand(8, 15), color: '', rot: 0, vr: 0,
+        t: 0, life: rand(0.2, 0.4), type: 'gtrail',
+      });
+    }
+  }
+
+  /* 기가 스톰프 */
+  if (H.stompN > 0) {
+    H.stompT -= dt;
+    if (H.stompT <= 0) {
+      H.stompN--;
+      H.stompT = 0.3;
+      H.x = clamp(H.x + H.face * 55, 60, G.worldLen - 60);
+      H.landT = Math.max(H.landT, 0.18);
+      const lv = G.actives.stomp;
+      const r = 170 + 25 * lv;
+      const dmg = Math.max(1, Math.ceil(power() * (1 + 0.4 * (lv - 1)))) * (G.rageT > 0 ? 2 : 1);
+      for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
+      hitZombies(H.x - r, H.x + r, 0);
+      hitBoss(H.x - r, H.x + r, dmg);
+      G.waves.push({
+        x: H.x, dir: H.face, traveled: 20, range: r + 130, speed: 900,
+        id: Math.random(), dmg: 1, gold: true,
+      });
+      addRing(H.x, GROUND, r, '#ffd23f', 6);
+      addCrack(H.x, r * 0.5);
+      spawnDust(H.x, GROUND, 10, r * 0.4);
+      shake(15);
+      impact(0.05);
+      SND.land(); SND.boom();
+    }
+  }
 
   /* 낙뢰 스케줄 */
   for (const pb of G.pendingBolts) {
@@ -2539,7 +2630,7 @@ function updateSkillLocks(){
 }
 /* 보상 액티브 스킬: 보유 시 버튼 표시 + 레벨 배지 */
 function updateUpgradeBadges(){
-  for (const k of ['quake', 'throwSteel', 'roar']) {
+  for (const k of ['quake', 'throwSteel', 'roar', 'spin', 'stomp']) {
     const lv = G.actives[k];
     ui.skills[k].classList.toggle('hidden', lv === 0);
     ui.tskills[k].classList.toggle('hidden', lv === 0);
@@ -2558,6 +2649,8 @@ function updateSkillCds(){
   if (G.actives.quake) setCd('quake', H.quakeCd, 12 * Math.pow(0.85, G.actives.quake - 1));
   if (G.actives.throwSteel) setCd('throwSteel', H.throwCd, 9 * Math.pow(0.85, G.actives.throwSteel - 1));
   if (G.actives.roar) setCd('roar', H.roarCd, 10 * Math.pow(0.85, G.actives.roar - 1));
+  if (G.actives.spin) setCd('spin', H.spinCd, 14 * Math.pow(0.85, G.actives.spin - 1));
+  if (G.actives.stomp) setCd('stomp', H.stompCd, 11 * Math.pow(0.85, G.actives.stomp - 1));
   ui.rageFill.style.height = (G.rageT > 0 ? 100 : G.rage) + '%';
   ui.skills.rage.classList.toggle('rage-ready', hasSkill('rage') && (G.rage >= 100 || G.rageT > 0));
   /* 분노: 게이지 % 또는 남은 지속시간 */
@@ -2594,6 +2687,8 @@ const ACTIVES = [
   { key: 'quake', name: '어스퀘이크', kb: 'Q', desc: '땅을 내리찍어\n화면 전체를 분쇄' },
   { key: 'throwSteel', name: '철골 투척', kb: 'E', desc: '강철 기둥을 던져\n관통 + 대폭발' },
   { key: 'roar', name: '헐크 포효', kb: 'F', desc: '전방 충격파\n보스 그로기' },
+  { key: 'spin', name: '토네이도 스핀', kb: 'T', desc: '회전하며 주변 360°\n전부 갈아버림' },
+  { key: 'stomp', name: '기가 스톰프', kb: 'G', desc: '전진 발구르기 3연타\n쿵마다 충격파' },
 ];
 function showClear(){
   G.state = 'clear';
@@ -2618,10 +2713,11 @@ function showClear(){
     ui.nextBtn.style.display = 'none';
     ui.upgradeRow.innerHTML = '';
     const notOwned = ACTIVES.filter(a => G.actives[a.key] === 0);
-    const pool = notOwned.length > 0 ? notOwned : ACTIVES;
+    const pool = (notOwned.length > 0 ? notOwned : ACTIVES)
+      .slice().sort(() => Math.random() - 0.5).slice(0, 3);
     ui.upgradeHead.textContent = notOwned.length > 0
-      ? '⚡ 새 스킬 획득 — 하나를 골라라!'
-      : '⚡ 모든 스킬 보유! 레벨업을 골라라!';
+      ? '⚡ 새 스킬 추가! (기존 스킬은 그대로 유지)'
+      : '⚡ 5개 스킬 전부 보유! 레벨업을 골라라!';
     for (const u of pool) {
       const lv = G.actives[u.key];
       const card = document.createElement('div');
@@ -4066,6 +4162,7 @@ function drawHulk(){
   const clapping = H.clapT > 0;
   const clapPh = clapping ? (0.5 - H.clapT) / 0.5 : 0;
   const dashing = H.dashT > 0;
+  const spinning = H.spinT > 0;
   /* 양손 합동 모션: 합장 박수 / 해머 내려찍기 */
   const hammering = punchRaw > 0 && pSeq === 2;
   const useHands = clapping || hammering;
@@ -4085,6 +4182,8 @@ function drawHulk(){
   ctx.save();
   ctx.translate(H.x, H.y);
   ctx.scale(H.face, 1);
+  /* 토네이도 스핀: 좌우 반전을 빠르게 오가며 회전 표현 */
+  if (spinning) ctx.scale(Math.sin(H.spinT * 26) >= 0 ? 1 : -1, 1);
   /* 쓰러짐 */
   if (G.state === 'defeat') ctx.rotate(1.35);
   /* 피격 무적 깜빡임 */
@@ -4231,6 +4330,7 @@ function drawHulk(){
       if (pSeq === 1) return front ? [0.95, 1.3, 1] : [1.5, 0.07, 1 + punchPh * 0.35];
       return front ? [1.5, 0.07, 1 + punchPh * 0.3] : [-0.75, 0.5, 1];
     }
+    if (spinning) return [front ? 1.5 : -1.5, 0.05, 1]; /* 팔 벌리고 회전 */
     if (H.roarT > 0) return front ? [1.05, 1.15, 1] : [-0.95, 0.9, 1];
     if (H.slam === 1) return [2.65, -0.2, 1];
     if (H.slam === 2) return [1.05, -0.1, 1];
