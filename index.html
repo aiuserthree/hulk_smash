@@ -211,6 +211,22 @@
   #unlockCard .t{font-size:12px;font-weight:900;letter-spacing:2px;color:#7a5b00}
   #unlockCard .n{font-family:"Black Han Sans";font-size:26px;color:var(--ink)}
 
+  /* 보스 보상: 강화 카드 */
+  #upgradeHead{display:none;font-family:"Black Han Sans";font-size:22px;color:var(--purple);margin-bottom:10px}
+  #upgradeHead.on{display:block}
+  #upgradeRow{display:none;gap:10px;justify-content:center;margin-bottom:16px;flex-wrap:wrap}
+  #upgradeRow.on{display:flex}
+  .upCard{
+    background:var(--yellow);border:3px solid var(--ink);border-radius:12px;
+    box-shadow:4px 4px 0 var(--ink);padding:10px 12px;width:138px;cursor:pointer;
+    font-family:"Noto Sans KR",sans-serif;text-align:center;transition:transform .08s;
+  }
+  .upCard:hover{transform:translate(-2px,-2px) rotate(-1deg);box-shadow:6px 6px 0 var(--ink)}
+  .upCard:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+  .upCard b{display:block;font-family:"Black Han Sans";font-size:17px;margin-bottom:4px;color:var(--ink)}
+  .upCard span{font-size:12px;font-weight:700;color:#5c4a00;line-height:1.3;display:block}
+  .upCard small{display:block;margin-top:6px;font-size:11px;color:#8a6d00;font-weight:900}
+
   /* ---------- 일시정지 ---------- */
   #pauseOv .panel{max-width:360px}
 
@@ -320,6 +336,8 @@
         <div class="stat"><b id="stScore">0</b><span>점수</span></div>
       </div>
       <div id="unlockCard"><div class="t">NEW SKILL!</div><div class="n" id="unlockName"></div></div>
+      <div id="upgradeHead">⚡ 보상을 선택하라!</div>
+      <div id="upgradeRow"></div>
       <div id="growthMsg">💪 헐크가 더 커졌다! 파워 상승!</div>
       <button class="bigbtn" id="nextBtn">다음 동네 부수러 →</button>
     </div>
@@ -329,7 +347,7 @@
   <div class="overlay" id="defeatOv">
     <div class="panel">
       <div class="burst-title" style="color:var(--red)">쓰러졌다…</div>
-      <div class="sub">메카가 너무 강했다. 다시 일어나서 부숴버리자!<br>팁: 보스가 번쩍이면 <b>점프</b>로 스톰프를 피하고, 돌진 후 <b>그로기</b> 때 두들겨라.</div>
+      <div class="sub">보스가 너무 강했다. 다시 일어나서 부숴버리자!<br>팁: 예고 동작이 보이면 <b>점프</b>나 <b>이동</b>으로 피하고, <b>그로기·재장전</b> 틈에 두들겨라.</div>
       <button class="bigbtn" id="retryBtn">다시 일어나기</button>
     </div>
   </div>
@@ -813,6 +831,8 @@ const G = {
   zombieSpawnT: 0,
   boss: null,
   bossDefeated: false,
+  projs: [],
+  upgrades: { punch: 0, slam: 0, clap: 0, dash: 0, rage: 0, hp: 0, size: 0 },
   stars: null,
   skyCols: null,
   rage: 0,               // 0~100 게이지
@@ -843,8 +863,12 @@ const H = {
   rageTick: 0,
   baseH: 128, baseW: 78,
 };
-/* 분노 변신 시 덩치 35% 팽창 */
-function hulkScale(){ return (1 + Math.min(G.stage - 1, 9) * 0.11) * (1 + 0.35 * G.rageRamp); }
+/* 분노 변신 시 덩치 35% 팽창 + 거인화 강화 */
+function hulkScale(){
+  return (1 + Math.min(G.stage - 1, 9) * 0.11)
+    * (1 + 0.35 * G.rageRamp)
+    * (1 + 0.06 * G.upgrades.size);
+}
 function hulkH(){ return H.baseH * hulkScale(); }
 function hulkW(){ return H.baseW * hulkScale(); }
 function power(){ return 2 + Math.floor((G.stage - 1) * 1.2); }
@@ -930,6 +954,7 @@ const ui = {
   clearSub: $('clearSub'), stDestroyed: $('stDestroyed'), stCombo: $('stCombo'),
   stScore: $('stScore'), unlockCard: $('unlockCard'), unlockName: $('unlockName'),
   growthMsg: $('growthMsg'), muteBtn: $('muteBtn'), touch: $('touch'),
+  upgradeHead: $('upgradeHead'), upgradeRow: $('upgradeRow'), nextBtn: $('nextBtn'),
   skills: {
     punch: $('sk-punch'), slam: $('sk-slam'), clap: $('sk-clap'),
     dash: $('sk-dash'), rage: $('sk-rage'),
@@ -998,6 +1023,7 @@ function genStage(n){
   G.bursts = []; G.wrecks = []; G.remains = [];
   G.bolts = []; G.pendingBolts = [];
   G.zombies = []; G.zombieSpawnT = 0;
+  G.projs = [];
   G.hitStop = 0; G.slowMo = 0; G.camKick = 0; G.zoomKick = 0;
   G.destroyed = 0; G.stageScore = 0; G.stageDestroyed = 0;
   G.combo = 0; G.comboT = 0; G.maxCombo = 0;
@@ -1032,17 +1058,27 @@ function genStage(n){
     G.objects = [];
     G.total = 0;
     G.worldLen = 1900;
-    /* HP는 헐크 파워에 비례 → 스테이지가 올라도 전투 시간 유지 */
-    const bhp = (2 + Math.floor((n - 1) * 1.2)) * 70;
+    /* 보스 3종 로테이션 + 회차(티어)마다 강해짐 */
+    const tier = Math.floor(n / 5);
+    const typeIdx = (tier - 1) % 3;
+    const btype = ['mech', 'beast', 'tank'][typeIdx];
+    const bname = ['타이탄', '베헤모스', '골리앗'][typeIdx];
+    const sizes = { mech: [170, 300], beast: [200, 250], tank: [280, 185] };
+    /* HP는 헐크 파워 비례 + 티어당 +18% */
+    const bhp = Math.round((2 + Math.floor((n - 1) * 1.2)) * 70 * (1 + 0.18 * (tier - 1)));
     G.boss = {
-      x: 1500, face: -1, w: 170, h: 300,
+      x: 1500, face: -1, w: sizes[btype][0], h: sizes[btype][1],
+      type: btype, name: bname, tier,
+      atkBonus: 3 * (tier - 1),
+      cdScale: Math.max(0.55, 1 - 0.08 * (tier - 1)),
       hp: bhp, maxHp: bhp,
       state: 'enter', t: 0, stateT: 0,
       hitFlash: 0, attackCd: 1.8,
       lastWave: -1, lastDash: -1, hitHulk: false,
       chargeDir: -1, dieT: 0, rot: 0, walkT: 0,
+      airY: 0, lvx: 0, lvy: 0, shots: 0, shotT: 0, recoil: 0,
     };
-    popup(1100, GROUND - 380, 'BOSS!!', 64, '#ff4b33');
+    popup(1100, GROUND - 380, bname + '!!', 60, '#ff4b33');
   }
 
   /* 배경 스카이라인 3층 (원경→근경) */
@@ -1072,6 +1108,7 @@ function genStage(n){
   H.punchCd = 0; H.slamCd = 0; H.clapCd = 0; H.dashCd = 0;
   H.punchSeq = 0; H.punchChainT = 0;
   H.knockT = 0; H.knockVx = 0; H.landT = 0;
+  H.maxHp = 100 + 25 * G.upgrades.hp;
   H.hp = H.maxHp; H.invulnT = 0; G.hurtT = 0;
   updateHpHUD();
   G.camX = 0;
@@ -1081,6 +1118,7 @@ function genStage(n){
 
 function startGame(){
   G.stage = 1; G.score = 0; G.rage = 0;
+  G.upgrades = { punch: 0, slam: 0, clap: 0, dash: 0, rage: 0, hp: 0, size: 0 };
   ui.startOv.classList.remove('on');
   ui.clearOv.classList.remove('on');
   ui.hud.classList.add('on');
@@ -1325,7 +1363,7 @@ function hitBoss(lo, hi, dmg, srcId, srcField){
   impact(0.05);
   shake(6);
   SND.clank();
-  if (hasSkill('rage') && G.rageT <= 0) G.rage = clamp(G.rage + 2, 0, 100);
+  if (hasSkill('rage') && G.rageT <= 0) G.rage = clamp(G.rage + 2 * (1 + 0.25 * G.upgrades.rage), 0, 100);
   if (b.hp <= 0) {
     b.hp = 0;
     b.state = 'dying';
@@ -1339,6 +1377,7 @@ function updateBoss(dt){
   const b = G.boss;
   b.t += dt;
   if (b.hitFlash > 0) b.hitFlash -= dt;
+  if (b.recoil > 0) b.recoil -= dt;
   const dx = H.x - b.x;
   if (b.state !== 'charge' && b.state !== 'dying') b.face = dx < 0 ? -1 : 1;
   /* 파손 연출 */
@@ -1364,17 +1403,81 @@ function updateBoss(dt){
     case 'walk': {
       b.attackCd -= dt;
       const adx = Math.abs(dx);
+      const wspd = b.type === 'beast' ? 110 : (b.type === 'tank' ? 60 : 85);
       if (adx > 180) {
-        b.x += Math.sign(dx) * 85 * dt;
+        b.x += Math.sign(dx) * wspd * dt;
         b.walkT += dt * 4.5;
         if (Math.random() < dt * 1.6) { SND.step(); shake(1.5); }
       }
       if (b.attackCd <= 0) {
-        if (adx < 280) { b.state = 'windup'; b.stateT = 0.6; }
-        else { b.state = 'chargePrep'; b.stateT = 0.65; }
+        if (b.type === 'mech') {
+          if (adx < 280) { b.state = 'windup'; b.stateT = 0.6; }
+          else { b.state = 'chargePrep'; b.stateT = 0.65; }
+        } else if (b.type === 'beast') {
+          if (adx < 280) { b.state = 'windup'; b.stateT = 0.6; }
+          else if (Math.random() < 0.5) { b.state = 'throw'; b.stateT = 0.7; }
+          else { b.state = 'leapPrep'; b.stateT = 0.5; }
+        } else { /* tank */
+          if (adx < 260) { b.state = 'chargePrep'; b.stateT = 0.7; }
+          else { b.state = 'volley'; b.shots = 3; b.shotT = 0.3; }
+        }
       }
       break;
     }
+    case 'throw':
+      b.stateT -= dt;
+      if (b.stateT <= 0) {
+        spawnProj('rock', b.x + b.face * 60, GROUND - b.h * 0.8, H.x + rand(-40, 40), 1.0, 16 + b.atkBonus);
+        SND.whoosh();
+        b.state = 'recover'; b.stateT = 0.8;
+        b.attackCd = rand(1.6, 2.4) * b.cdScale;
+      }
+      break;
+    case 'leapPrep':
+      b.stateT -= dt;
+      if (b.stateT <= 0) {
+        b.state = 'leap';
+        const T = 0.8;
+        b.lvx = clamp((H.x - b.x) / T, -900, 900);
+        b.lvy = 2200 * T / 2;
+        SND.jump();
+      }
+      break;
+    case 'leap':
+      b.airY += b.lvy * dt;
+      b.lvy -= 2200 * dt;
+      b.x += b.lvx * dt;
+      b.x = clamp(b.x, 130, G.worldLen - 130);
+      if (b.airY <= 0 && b.lvy < 0) {
+        b.airY = 0;
+        addRing(b.x, GROUND, 300, '#ffd23f', 8);
+        addCrack(b.x, 220);
+        spawnDust(b.x, GROUND, 18, 150);
+        shake(22);
+        impact(0.06);
+        SND.land(); SND.boom();
+        if (H.onGround && Math.abs(H.x - b.x) < 280) hulkKnock(Math.sign(H.x - b.x) || 1, 20 + b.atkBonus);
+        hitZombies(b.x - 260, b.x + 260, 0);
+        b.state = 'recover'; b.stateT = 1.0;
+        b.attackCd = rand(1.6, 2.4) * b.cdScale;
+      }
+      break;
+    case 'volley':
+      b.shotT -= dt;
+      if (b.shotT <= 0 && b.shots > 0) {
+        b.shots--;
+        b.shotT = 0.38;
+        b.recoil = 0.15;
+        spawnProj('shell', b.x - b.face * 20, GROUND - b.h * 0.85, H.x + rand(-60, 60), 0.9, 14 + b.atkBonus);
+        SND.crash();
+        shake(4);
+        if (b.shots === 0) {
+          b.state = 'stunned'; b.stateT = 1.6; /* 재장전: 공략 타이밍 */
+          popup(b.x, GROUND - b.h - 60, '재장전!', 24, '#ffd23f');
+          b.attackCd = rand(1.6, 2.4) * b.cdScale;
+        }
+      }
+      break;
     case 'windup':
       b.stateT -= dt;
       if (b.stateT <= 0) {
@@ -1390,8 +1493,8 @@ function updateBoss(dt){
           x: fx2, dir: d, traveled: 20, range: 340, speed: 700,
           id: Math.random(), dmg: 1, gold: true, fromBoss: true,
         });
-        if (H.onGround && Math.abs(H.x - fx2) < 300) hulkKnock(Math.sign(H.x - fx2) || -b.face, 18);
-        b.attackCd = rand(1.6, 2.4);
+        if (H.onGround && Math.abs(H.x - fx2) < 300) hulkKnock(Math.sign(H.x - fx2) || -b.face, 18 + b.atkBonus);
+        b.attackCd = rand(1.6, 2.4) * b.cdScale;
       }
       break;
     case 'chargePrep':
@@ -1402,23 +1505,27 @@ function updateBoss(dt){
         SND.dash();
       }
       break;
-    case 'charge':
+    case 'charge': {
       b.stateT -= dt;
-      b.x += b.chargeDir * 640 * dt;
+      const cspd = b.type === 'tank' ? 520 : 640;
+      const hitW = b.type === 'tank' ? 150 : 110;
+      b.x += b.chargeDir * cspd * dt;
       b.x = clamp(b.x, 130, G.worldLen - 130);
       b.walkT += dt * 10;
       if (!reducedMotion && Math.random() < 0.7) spawnDust(b.x - b.chargeDir * 70, GROUND, 1, 40);
-      if (!b.hitHulk && H.onGround && Math.abs(H.x - b.x) < 110) {
+      if (!b.hitHulk && H.onGround && Math.abs(H.x - b.x) < hitW) {
         b.hitHulk = true;
-        hulkKnock(b.chargeDir, 24);
+        hulkKnock(b.chargeDir, 24 + b.atkBonus);
       }
       if (b.stateT <= 0 || b.x <= 131 || b.x >= G.worldLen - 131) {
         b.state = 'stunned'; b.stateT = 1.8; /* 그로기: 2배 데미지 찬스 */
         spawnSparks(b.x, GROUND - 120, -b.chargeDir, 9);
         popup(b.x, GROUND - b.h - 60, '그로기!', 26, '#ffd23f');
         SND.crash();
+        b.attackCd = rand(1.6, 2.4) * b.cdScale;
       }
       break;
+    }
     case 'recover':
     case 'stunned':
       b.stateT -= dt;
@@ -1449,6 +1556,39 @@ function updateBoss(dt){
       }
       break;
   }
+}
+
+/* 보스 투사체 (바위·포탄): 포물선 → 착탄 폭발 */
+function spawnProj(kind, x, y, targetX, T, dmg){
+  const dy = GROUND - y;
+  G.projs.push({
+    kind, x, y,
+    vx: (targetX - x) / T,
+    vy: (dy - 0.5 * 1400 * T * T) / T,
+    dmg, rot: rand(0, 6), vr: rand(-7, 7),
+    landX: targetX, dead: false,
+  });
+}
+function updateProjs(dt){
+  for (const pr of G.projs) {
+    pr.vy += 1400 * dt;
+    pr.x += pr.vx * dt;
+    pr.y += pr.vy * dt;
+    pr.rot += pr.vr * dt;
+    if (pr.y >= GROUND) {
+      pr.dead = true;
+      fireball(pr.x, GROUND - 14, false);
+      addRing(pr.x, GROUND, 110, '#ff9d5e', 5);
+      addCrack(pr.x, 70);
+      spawnDust(pr.x, GROUND, 6, 60);
+      shake(8);
+      impact(0.03);
+      SND.boom();
+      if (H.onGround && Math.abs(H.x - pr.x) < 130) hulkKnock(Math.sign(H.x - pr.x) || 1, pr.dmg);
+      hitZombies(pr.x - 110, pr.x + 110, 0);
+    }
+  }
+  G.projs = G.projs.filter(pr => !pr.dead);
 }
 
 /* 낙뢰 (하늘에서 번개 내리꽂기) */
@@ -1608,7 +1748,7 @@ function destroyObj(o, big){
 
   /* 분노 게이지 */
   if (hasSkill('rage') && G.rageT <= 0) {
-    G.rage = clamp(G.rage + (isBig ? 9 : 5), 0, 100);
+    G.rage = clamp(G.rage + (isBig ? 9 : 5) * (1 + 0.25 * G.upgrades.rage), 0, 100);
   }
   updateHUD();
 
@@ -1644,7 +1784,7 @@ function doPunch(){
   const range = (heavy ? 84 : 60) * hulkScale() + G.stage * 6;
   const [a, b] = frontHitbox(range);
   const targets = objectsInRange(a, b);
-  const dmg = power() * (heavy ? 2 : 1) * (G.rageT > 0 ? 2 : 1);
+  const dmg = Math.max(1, Math.round(power() * (heavy ? 2 : 1) * (G.rageT > 0 ? 2 : 1) * (1 + 0.3 * G.upgrades.punch)));
   if (heavy) SND.punchHeavy(); else SND.punch();
   const zk = hitZombies(a, b, H.face);
   const bossHit = hitBoss(a, b, dmg);
@@ -1678,14 +1818,14 @@ function doJump(){
 }
 function doSlam(){
   if (!hasSkill('slam') || H.slamCd > 0 || H.slam || H.dashT > 0 || H.clapT > 0) return;
-  H.slam = 1; H.slamCd = 2.6; H.onGround = false;
+  H.slam = 1; H.slamCd = 2.6 * Math.pow(0.8, G.upgrades.slam); H.onGround = false;
   H.vy = -1000;
   H.vx = H.face * 180;
   SND.jump();
   popup(H.x, GROUND - hulkH() - 40, 'METEOR SLAM!!', 30, '#ffd23f');
 }
 function slamImpact(){
-  const r = (230 + G.stage * 15) * (G.rageT > 0 ? 1.3 : 1);
+  const r = (230 + G.stage * 15) * (G.rageT > 0 ? 1.3 : 1) * (1 + 0.25 * G.upgrades.slam);
   const dmg = power() * 2 * (G.rageT > 0 ? 2 : 1);
   for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
   hitZombies(H.x - r, H.x + r, 0);
@@ -1723,8 +1863,9 @@ function doClap(){
     id: Math.random(),
     dmg: Math.ceil(power() * 1.6) * (G.rageT > 0 ? 2 : 1),
   });
-  /* 전방 경로에 낙뢰 3연격 */
-  for (let i = 0; i < 3; i++) {
+  /* 전방 경로에 낙뢰 연격 (강화 시 +1발) */
+  const nBolts = 3 + G.upgrades.clap;
+  for (let i = 0; i < nBolts; i++) {
     G.pendingBolts.push({ x: H.x + dir * (170 + i * 160 + rand(-30, 30)), delay: 0.12 + i * 0.1 });
   }
   SND.clap();
@@ -1733,14 +1874,14 @@ function doClap(){
 }
 function doDash(){
   if (!hasSkill('dash') || H.dashCd > 0 || H.dashT > 0 || H.slam || H.clapT > 0) return;
-  H.dashT = 0.5; H.dashCd = 5;
+  H.dashT = 0.5; H.dashCd = 5 * Math.pow(0.75, G.upgrades.dash);
   H.dashId = Math.random();
   SND.dash(); SND.roar();
   popup(H.x, GROUND - hulkH() - 40, 'COMET DASH!!!', 32, '#9fe36a');
 }
 function doRage(){
   if (!hasSkill('rage') || G.rage < 100 || G.rageT > 0) return;
-  G.rage = 0; G.rageT = 8;
+  G.rage = 0; G.rageT = 8 + 2 * G.upgrades.rage;
   G.rageGrinT = 0.9; /* "헐크… 스매쉬" — 씩 웃기 */
   /* 변신하며 상처 회복 */
   if (H.hp < H.maxHp) {
@@ -1916,6 +2057,7 @@ function update(dt){
 
   /* 보스 */
   if (G.boss) updateBoss(dt);
+  if (G.projs.length) updateProjs(dt);
 
   /* 좀비 떼 AI */
   if (G.rageT > 0) {
@@ -2163,7 +2305,7 @@ function flashReady(name){
 function updateHUD(){
   ui.stageNum.textContent = G.stage;
   if (G.boss) {
-    ui.progressWord.textContent = 'BOSS';
+    ui.progressWord.textContent = 'BOSS · ' + G.boss.name;
     ui.progressCount.textContent = Math.max(0, Math.ceil(G.boss.hp)) + ' / ' + G.boss.maxHp;
     ui.progressFill.style.width = clamp(G.boss.hp / G.boss.maxHp * 100, 0, 100) + '%';
     ui.progressFill.style.background = 'linear-gradient(90deg,#e03a2a,#ff8a3c)';
@@ -2184,9 +2326,9 @@ function updateSkillLocks(){
 }
 function updateSkillCds(){
   setCd('punch', H.punchCd, 0.32);
-  setCd('slam', H.slamCd, 2.6);
+  setCd('slam', H.slamCd, 2.6 * Math.pow(0.8, G.upgrades.slam));
   setCd('clap', H.clapCd, 4.5);
-  setCd('dash', H.dashCd, 5);
+  setCd('dash', H.dashCd, 5 * Math.pow(0.75, G.upgrades.dash));
   ui.rageFill.style.height = (G.rageT > 0 ? 100 : G.rage) + '%';
   ui.skills.rage.classList.toggle('rage-ready', hasSkill('rage') && (G.rage >= 100 || G.rageT > 0));
   /* 분노: 게이지 % 또는 남은 지속시간 */
@@ -2218,6 +2360,16 @@ function setCd(name, cd, max){
 
 /* ---------- 클리어 ---------- */
 const SKILL_NAMES = { slam: '메테오 슬램 (X)', clap: '낙뢰 박수 (C)', dash: '혜성 돌진 (V)', rage: '분노 폭발 (R)' };
+/* 보스 보상 강화 풀 */
+const UPGRADES = [
+  { key: 'punch', name: '강철 주먹', desc: '주먹 데미지 +30%' },
+  { key: 'slam', name: '메가 메테오', desc: '슬램 범위 +25%\n쿨타임 -20%' },
+  { key: 'clap', name: '폭풍 낙뢰', desc: '낙뢰 +1발' },
+  { key: 'dash', name: '초음속 혜성', desc: '돌진 쿨타임 -25%' },
+  { key: 'rage', name: '끝없는 분노', desc: '분노 +2초\n게이지 충전 +25%' },
+  { key: 'hp', name: '강철 피부', desc: '최대 HP +25' },
+  { key: 'size', name: '거인화', desc: '덩치와 리치 +6%' },
+];
 function showClear(){
   G.state = 'clear';
   SND.fanfare();
@@ -2233,6 +2385,30 @@ function showClear(){
     setTimeout(() => SND.unlock(), 550);
   } else {
     ui.unlockCard.classList.remove('on');
+  }
+  /* 보스 보상: 강화 카드 3장 중 택1 */
+  if (G.bossDefeated) {
+    ui.upgradeHead.classList.add('on');
+    ui.upgradeRow.classList.add('on');
+    ui.nextBtn.style.display = 'none';
+    ui.upgradeRow.innerHTML = '';
+    const pool = UPGRADES.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+    for (const u of pool) {
+      const card = document.createElement('div');
+      card.className = 'upCard';
+      card.innerHTML = '<b>' + u.name + '</b><span>' + u.desc.replace('\n', '<br>') + '</span>'
+        + '<small>Lv.' + G.upgrades[u.key] + ' → Lv.' + (G.upgrades[u.key] + 1) + '</small>';
+      card.addEventListener('click', () => {
+        G.upgrades[u.key]++;
+        SND.unlock();
+        nextStage();
+      });
+      ui.upgradeRow.appendChild(card);
+    }
+  } else {
+    ui.upgradeHead.classList.remove('on');
+    ui.upgradeRow.classList.remove('on');
+    ui.nextBtn.style.display = '';
   }
   ui.growthMsg.textContent = G.stage < 10
     ? '💪 헐크가 더 커졌다! 덩치 +11%, 파워 UP!'
@@ -2512,6 +2688,46 @@ function render(){
 
   /* 보스 */
   if (G.boss) drawBoss(G.boss);
+
+  /* 보스 투사체 (바위·포탄 + 착탄 경고) */
+  for (const pr of G.projs) {
+    if (pr.kind === 'shell') {
+      ctx.save();
+      ctx.globalAlpha = 0.45 + Math.sin(G.time * 14) * 0.2;
+      ctx.strokeStyle = '#ff5a3a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(pr.landX, GROUND + 2, 46, 9, 0, 0, 7);
+      ctx.stroke();
+      ctx.restore();
+      ctx.save();
+      ctx.translate(pr.x, pr.y);
+      ctx.rotate(Math.atan2(pr.vy, pr.vx));
+      ctx.fillStyle = '#2c3226';
+      ctx.beginPath(); ctx.roundRect(-12, -5, 24, 10, 5); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = 'rgba(255,160,60,.7)';
+      ctx.beginPath(); ctx.arc(-12, 0, 6, 0, 7); ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.translate(pr.x, pr.y);
+      ctx.rotate(pr.rot);
+      const rg3 = ctx.createRadialGradient(-5, -6, 3, 0, 0, 18);
+      rg3.addColorStop(0, '#a49a8c');
+      rg3.addColorStop(1, '#57504a');
+      ctx.fillStyle = rg3;
+      ctx.beginPath();
+      ctx.moveTo(-16, -6); ctx.lineTo(-6, -16); ctx.lineTo(8, -14); ctx.lineTo(17, -2);
+      ctx.lineTo(12, 12); ctx.lineTo(-6, 15); ctx.lineTo(-16, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(20,20,25,.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
 
   /* 좀비 떼 */
   for (const z of G.zombies) {
@@ -3165,19 +3381,53 @@ function drawObject(o){
   ctx.restore();
 }
 
-/* ---------- 보스 그리기 (거대 전투 메카) ---------- */
+/* ---------- 보스 그리기 (3종: 메카·괴수·전차) ---------- */
 function drawBoss(b){
   ctx.save();
-  ctx.translate(b.x, GROUND);
+  ctx.translate(b.x, GROUND - (b.airY || 0));
   /* 그림자 */
   ctx.fillStyle = 'rgba(15,15,25,.3)';
   ctx.beginPath();
-  ctx.ellipse(0, 4, b.w * 0.62, 11, 0, 0, 7);
+  ctx.ellipse(0, (b.airY || 0) + 4, b.w * 0.62 * Math.max(0.4, 1 - (b.airY || 0) / 900), 11, 0, 0, 7);
   ctx.fill();
   ctx.scale(b.face, 1);
-  /* 상태별 자세 */
   if (b.state === 'dying') ctx.rotate(-b.rot);
-  else if (b.state === 'charge') ctx.rotate(0.2);
+  if (b.type === 'beast') drawBeastBody(b);
+  else if (b.type === 'tank') drawTankBody(b);
+  else drawMechBody(b);
+  /* 피격 플래시 */
+  if (b.hitFlash > 0) {
+    ctx.globalAlpha = Math.max(0, b.hitFlash * 6);
+    ctx.fillStyle = '#fff4dc';
+    ctx.fillRect(-b.w * 0.65, -b.h * 1.05, b.w * 1.3, b.h * 1.05);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  /* 머리 위 HP 바 */
+  if (b.state !== 'dying') {
+    const bw = 220, bx = b.x - bw / 2, by = GROUND - b.h - (b.airY || 0) - 46;
+    ctx.fillStyle = 'rgba(15,18,28,.6)';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, 12, 6); ctx.fill();
+    const hg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    hg.addColorStop(0, '#e03a2a');
+    hg.addColorStop(1, '#ff8a3c');
+    ctx.fillStyle = hg;
+    ctx.beginPath();
+    ctx.roundRect(bx + 2, by + 2, Math.max(4, (bw - 4) * clamp(b.hp / b.maxHp, 0, 1)), 8, 4);
+    ctx.fill();
+  }
+}
+function bossMetal(x0, y0, x1, y1, hi, mid, dk){
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  g.addColorStop(0, hi);
+  g.addColorStop(0.5, mid);
+  g.addColorStop(1, dk);
+  return g;
+}
+
+/* ---- 타이탄: 거대 전투 메카 ---- */
+function drawMechBody(b){
+  if (b.state === 'charge') ctx.rotate(0.2);
   else if (b.state === 'chargePrep') ctx.rotate(-0.1);
   else if (b.state === 'stunned') ctx.rotate(Math.sin(b.t * 18) * 0.03 + 0.08);
   const crouch = b.state === 'windup' ? (0.6 - b.stateT) / 0.6 * 20 : 0;
@@ -3187,13 +3437,7 @@ function drawBoss(b){
   ctx.strokeStyle = 'rgba(12,15,22,.55)';
   ctx.lineJoin = 'round';
   ctx.lineWidth = 3;
-  const metal = (x0, y0, x1, y1) => {
-    const g = ctx.createLinearGradient(x0, y0, x1, y1);
-    g.addColorStop(0, '#77836a');
-    g.addColorStop(0.5, '#586250');
-    g.addColorStop(1, '#333a2c');
-    return g;
-  };
+  const metal = (x0, y0, x1, y1) => bossMetal(x0, y0, x1, y1, '#77836a', '#586250', '#333a2c');
   /* 다리 */
   for (const sx of [-1, 1]) {
     const lx = sx * w * 0.27;
@@ -3201,12 +3445,10 @@ function drawBoss(b){
     ctx.beginPath();
     ctx.roundRect(lx - 19, -h * 0.5, 38, h * 0.5, 7);
     ctx.fill(); ctx.stroke();
-    /* 무릎 장갑판 */
     ctx.fillStyle = '#454e3a';
     ctx.beginPath();
     ctx.roundRect(lx - 23, -h * 0.28, 46, 26, 6);
     ctx.fill(); ctx.stroke();
-    /* 발 */
     ctx.fillStyle = '#3a4130';
     ctx.beginPath();
     ctx.roundRect(lx - 30, -14, 64, 14, 4);
@@ -3218,7 +3460,6 @@ function drawBoss(b){
   ctx.beginPath();
   ctx.roundRect(-w * 0.48, ty - h * 0.42, w * 0.96, h * 0.42, 12);
   ctx.fill(); ctx.stroke();
-  /* 가슴 통풍구 */
   ctx.save();
   ctx.strokeStyle = 'rgba(12,15,22,.4)';
   ctx.lineWidth = 3;
@@ -3229,7 +3470,7 @@ function drawBoss(b){
     ctx.stroke();
   }
   ctx.restore();
-  /* 코어 (발광) */
+  /* 코어 */
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   const core = ctx.createRadialGradient(w * 0.06, ty - h * 0.2, 2, w * 0.06, ty - h * 0.2, 26);
@@ -3239,7 +3480,7 @@ function drawBoss(b){
   ctx.fillStyle = core;
   ctx.fillRect(w * 0.06 - 26, ty - h * 0.2 - 26, 52, 52);
   ctx.restore();
-  /* 어깨 장갑 */
+  /* 어깨 */
   ctx.fillStyle = '#4c553f';
   ctx.beginPath();
   ctx.roundRect(-w * 0.62, ty - h * 0.44, w * 0.26, 34, 8);
@@ -3247,7 +3488,7 @@ function drawBoss(b){
   ctx.beginPath();
   ctx.roundRect(w * 0.38, ty - h * 0.44, w * 0.26, 34, 8);
   ctx.fill(); ctx.stroke();
-  /* 앞팔: 거대 피스톤 주먹 (돌진 시 뻗음) */
+  /* 피스톤 주먹 */
   const fistExt = b.state === 'charge' ? 46 : (b.state === 'chargePrep' ? -18 : 0);
   ctx.fillStyle = metal(w * 0.4, 0, w * 0.75, 0);
   ctx.beginPath();
@@ -3257,7 +3498,7 @@ function drawBoss(b){
   ctx.beginPath();
   ctx.roundRect(w * 0.4 + fistExt, ty - h * 0.14, 46, 42, 9);
   ctx.fill(); ctx.stroke();
-  /* 뒷팔: 캐논 */
+  /* 캐논 */
   ctx.fillStyle = '#3e4632';
   ctx.beginPath();
   ctx.roundRect(-w * 0.6, ty - h * 0.3, 24, h * 0.2, 7);
@@ -3265,7 +3506,7 @@ function drawBoss(b){
   ctx.fillStyle = '#2e3426';
   ctx.fillRect(-w * 0.58, ty - h * 0.32, 68, 15);
   ctx.strokeRect(-w * 0.58, ty - h * 0.32, 68, 15);
-  /* 머리: 콕핏 + 붉은 바이저 */
+  /* 콕핏 */
   ctx.fillStyle = metal(-22, ty - h * 0.42 - 30, 22, ty - h * 0.42);
   ctx.beginPath();
   ctx.roundRect(-20, ty - h * 0.42 - 30, 44, 32, 7);
@@ -3275,27 +3516,170 @@ function drawBoss(b){
   ctx.fillStyle = 'rgba(255,60,50,' + (0.65 + Math.sin(b.t * 6) * 0.25) + ')';
   ctx.fillRect(-10, ty - h * 0.42 - 22, 30, 8);
   ctx.restore();
-  /* 피격 플래시 */
-  if (b.hitFlash > 0) {
-    ctx.globalAlpha = Math.max(0, b.hitFlash * 6);
-    ctx.fillStyle = '#fff4dc';
-    ctx.fillRect(-w * 0.65, ty - h * 0.48 - 32, w * 1.3, h * 0.95);
-    ctx.globalAlpha = 1;
-  }
-  ctx.restore();
-  /* 머리 위 HP 바 */
-  if (b.state !== 'dying') {
-    const bw = 220, bx = b.x - bw / 2, by = GROUND - b.h - 46;
-    ctx.fillStyle = 'rgba(15,18,28,.6)';
-    ctx.beginPath(); ctx.roundRect(bx, by, bw, 12, 6); ctx.fill();
-    const hg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-    hg.addColorStop(0, '#e03a2a');
-    hg.addColorStop(1, '#ff8a3c');
-    ctx.fillStyle = hg;
+}
+
+/* ---- 베헤모스: 거대 괴수 (너클워킹) ---- */
+function drawBeastBody(b){
+  if (b.state === 'leap') ctx.rotate(-0.12);
+  else if (b.state === 'stunned') ctx.rotate(Math.sin(b.t * 18) * 0.03 + 0.06);
+  const crouch = (b.state === 'windup' || b.state === 'leapPrep') ? 22 : 0;
+  ctx.translate(0, crouch);
+  const bob = Math.sin(b.walkT) * 5;
+  const w = b.w, h = b.h;
+  ctx.strokeStyle = 'rgba(18,14,26,.5)';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3;
+  const skin = (x0, y0, x1, y1) => bossMetal(x0, y0, x1, y1, '#a493bd', '#7a6a96', '#453a5e');
+  /* 뒷다리 */
+  ctx.fillStyle = skin(-w * 0.4, 0, -w * 0.1, 0);
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.38, -h * 0.4, 52, h * 0.4, 16);
+  ctx.fill(); ctx.stroke();
+  /* 뒷팔 (너클) */
+  ctx.fillStyle = '#5c5078';
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.12, -h * 0.72 - bob, 44, h * 0.72 + bob, 18);
+  ctx.fill(); ctx.stroke();
+  /* 몸통: 굽은 등 거대 혹 */
+  const hump = skin(-w * 0.5, -h, w * 0.5, -h * 0.3);
+  ctx.fillStyle = hump;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.5, -h * 0.18);
+  ctx.quadraticCurveTo(-w * 0.62, -h * 0.78 - bob, -w * 0.12, -h * 0.98 - bob);
+  ctx.quadraticCurveTo(w * 0.3, -h * 1.08 - bob, w * 0.52, -h * 0.62 - bob);
+  ctx.quadraticCurveTo(w * 0.6, -h * 0.3, w * 0.42, -h * 0.12);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  /* 등 가시 */
+  ctx.fillStyle = '#38304e';
+  for (let i = 0; i < 4; i++) {
+    const sxp = -w * 0.42 + i * w * 0.2;
+    const syp = -h * (0.72 + i * 0.08) - bob;
     ctx.beginPath();
-    ctx.roundRect(bx + 2, by + 2, Math.max(4, (bw - 4) * clamp(b.hp / b.maxHp, 0, 1)), 8, 4);
+    ctx.moveTo(sxp, syp);
+    ctx.lineTo(sxp + 16, syp - 34 - i * 4);
+    ctx.lineTo(sxp + 30, syp + 4);
+    ctx.closePath();
     ctx.fill();
   }
+  /* 머리: 낮게 앞으로, 벌어진 턱 */
+  const hx = w * 0.42, hy = -h * 0.66 - bob;
+  ctx.fillStyle = skin(hx - 30, hy - 30, hx + 30, hy + 30);
+  ctx.beginPath();
+  ctx.roundRect(hx - 26, hy - 26, 66, 44, 14);
+  ctx.fill(); ctx.stroke();
+  /* 턱 + 이빨 */
+  ctx.fillStyle = '#4c4066';
+  ctx.beginPath();
+  ctx.roundRect(hx - 12, hy + 14, 54, 16, 6);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#e8e2d4';
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(hx + i * 12, hy + 14);
+    ctx.lineTo(hx + 5 + i * 12, hy + 23);
+    ctx.lineTo(hx + 10 + i * 12, hy + 14);
+    ctx.closePath();
+    ctx.fill();
+  }
+  /* 눈 (주황 발광) */
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = 'rgba(255,140,40,' + (0.7 + Math.sin(b.t * 7) * 0.25) + ')';
+  ctx.beginPath();
+  ctx.arc(hx + 14, hy - 6, 6, 0, 7);
+  ctx.arc(hx + 32, hy - 4, 5, 0, 7);
+  ctx.fill();
+  ctx.restore();
+  /* 앞팔: 땅 짚은 거대 주먹 (투척 시 들어올림) */
+  const raise = b.state === 'throw' ? (0.7 - b.stateT) / 0.7 : 0;
+  ctx.save();
+  ctx.translate(w * 0.3, -h * 0.62 - bob);
+  ctx.rotate(-raise * 1.4);
+  ctx.fillStyle = skin(-30, 0, 30, 0);
+  ctx.beginPath();
+  ctx.roundRect(-26, -12, 56, h * 0.62 + bob + 12, 20);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#5c5078';
+  ctx.beginPath();
+  ctx.roundRect(-32, h * 0.62 + bob - 34, 70, 36, 12);
+  ctx.fill(); ctx.stroke();
+  /* 손에 든 바위 */
+  if (raise > 0.3) {
+    ctx.fillStyle = '#6e675e';
+    ctx.beginPath();
+    ctx.arc(0, -32, 24, 0, 7);
+    ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ---- 골리앗: 공성 전차 ---- */
+function drawTankBody(b){
+  if (b.state === 'stunned') ctx.rotate(Math.sin(b.t * 16) * 0.015);
+  const w = b.w, h = b.h;
+  ctx.strokeStyle = 'rgba(12,15,22,.55)';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3;
+  const metal = (x0, y0, x1, y1) => bossMetal(x0, y0, x1, y1, '#8a8f78', '#5e6450', '#363b2c');
+  /* 궤도 */
+  ctx.fillStyle = bossMetal(0, -46, 0, 0, '#4a5240', '#33392c', '#20241a');
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.5, -46, w, 46, 20);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#5f6a52';
+  for (let i = 0; i < 7; i++) {
+    ctx.beginPath();
+    ctx.arc(-w * 0.42 + i * (w * 0.84 / 6), -22, 12, 0, 7);
+    ctx.fill();
+  }
+  /* 차체 */
+  const hy = -46;
+  ctx.fillStyle = metal(-w / 2, hy - h * 0.45, w / 2, hy);
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.5, hy);
+  ctx.lineTo(-w * 0.42, hy - h * 0.42);
+  ctx.lineTo(w * 0.4, hy - h * 0.42);
+  ctx.lineTo(w * 0.52, hy);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  /* 포탑 */
+  const recoilX = (b.recoil > 0 ? -b.recoil * 90 : 0);
+  ctx.save();
+  ctx.translate(recoilX * 0.3, 0);
+  ctx.fillStyle = metal(-50, hy - h * 0.42 - 50, 50, hy - h * 0.42);
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.24, hy - h * 0.42 - 52, w * 0.44, 52, 10);
+  ctx.fill(); ctx.stroke();
+  /* 포신 (헐크 쪽으로) */
+  ctx.fillStyle = '#2e3426';
+  ctx.save();
+  ctx.translate(w * 0.16, hy - h * 0.42 - 30);
+  ctx.rotate(-0.22);
+  ctx.fillRect(0 + recoilX, -9, w * 0.52, 18);
+  ctx.strokeRect(0 + recoilX, -9, w * 0.52, 18);
+  ctx.fillStyle = '#20241a';
+  ctx.fillRect(w * 0.52 - 10 + recoilX, -12, 14, 24);
+  /* 발사 화염 */
+  if (b.recoil > 0.08) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(255,180,70,.9)';
+    ctx.beginPath();
+    ctx.arc(w * 0.52 + 16 + recoilX, 0, 20, 0, 7);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.restore();
+  /* 센서 */
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = 'rgba(255,60,50,' + (0.6 + Math.sin(b.t * 8) * 0.3) + ')';
+  ctx.beginPath();
+  ctx.arc(-w * 0.14, hy - h * 0.42 - 58, 6, 0, 7);
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#454e3a';
+  ctx.fillRect(-w * 0.15, hy - h * 0.42 - 66, 3, 14);
 }
 
 /* ---------- 좀비 그리기 ---------- */
