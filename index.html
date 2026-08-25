@@ -2163,8 +2163,8 @@ function doRage(){
   shake(26);
   zoomKick(0.1);
   G.flash = 0.2;
-  addRing(H.x, GROUND - hulkH() / 2, 380, '#ff4b33', 10);
-  popup(H.x, GROUND - hulkH() - 80, 'HULK SMASH!!!!', 52, '#ff4b33');
+  addRing(H.x, GROUND - hulkH() / 2, 380, '#8aff4a', 10);
+  popup(H.x, GROUND - hulkH() - 80, 'HULK SMASH!!!!', 52, '#b6ff4d');
   /* 좀비 떼 습격 */
   spawnHorde(12 + Math.min(G.stage * 2, 14));
   popup(H.x, GROUND - hulkH() - 140, '좀비 떼가 몰려온다!!', 30, '#9fe36a');
@@ -2509,11 +2509,12 @@ function update(dt){
       hitBoss(H.x - hw, H.x + hw, power() * 2);
     }
     if (!reducedMotion && G.particles.length < 320 && Math.random() < 0.55) {
+      /* 감마 에너지 오라 (초록 입자 상승) */
       G.particles.push({
         x: H.x + rand(-0.7, 0.7) * hulkW(), y: GROUND - rand(0, hulkH()),
-        vx: rand(-25, 25), vy: -rand(70, 190),
-        size: rand(1.8, 3.5), color: '', rot: 0, vr: 0,
-        t: 0, life: rand(0.4, 0.8), type: 'ember',
+        vx: rand(-20, 20), vy: -rand(70, 190),
+        size: rand(5, 10), color: '', rot: 0, vr: 0,
+        t: 0, life: rand(0.35, 0.7), type: 'gtrail',
       });
     }
   }
@@ -3692,11 +3693,11 @@ function render(){
     ctx.fillRect(0, 0, W, Hpx);
   }
 
-  /* 분노 화면 효과 */
+  /* 분노 화면 효과 (감마 그린) */
   if (G.rageT > 0) {
     const rg = ctx.createRadialGradient(W / 2, Hpx / 2, Hpx * 0.35, W / 2, Hpx / 2, Hpx * 0.75);
-    rg.addColorStop(0, 'rgba(255,75,51,0)');
-    rg.addColorStop(1, 'rgba(255,75,51,' + (0.28 + Math.sin(G.time * 10) * 0.06) + ')');
+    rg.addColorStop(0, 'rgba(110,235,70,0)');
+    rg.addColorStop(1, 'rgba(110,235,70,' + (0.26 + Math.sin(G.time * 10) * 0.06) + ')');
     ctx.fillStyle = rg;
     ctx.fillRect(0, 0, W, Hpx);
   }
@@ -4511,7 +4512,7 @@ function drawHulk(){
 
   /* 무비풍 올리브 그린 5톤 — 분노 변신 시 붉은 폭주 형태 */
   const P = raging
-    ? { hi:'#ff9d6e', base:'#d9553a', mid:'#a83c28', dark:'#7a2a1c', deep:'#521c12' }
+    ? { hi:'#d6ff7d', base:'#4fae3a', mid:'#338526', dark:'#22631b', deep:'#154711' }
     : { hi:'#b2e56c', base:'#65c148', mid:'#419e34', dark:'#2c7c25', deep:'#1d5619' };
   const skinF = [[0, P.hi], [0.42, P.base], [1, P.dark]];
   const skinB = [[0, P.base], [0.42, P.mid], [1, P.deep]];
@@ -4536,8 +4537,8 @@ function drawHulk(){
     ctx.globalAlpha = 0.55;
   }
   if (raging) {
-    ctx.shadowColor = 'rgba(255,75,51,.85)';
-    ctx.shadowBlur = 20 + Math.sin(G.time * 9) * 7;
+    ctx.shadowColor = 'rgba(140,255,80,.8)'; /* 감마 오라 */
+    ctx.shadowBlur = 22 + Math.sin(G.time * 9) * 8;
   }
 
   /* 바닥 그림자 */
@@ -4805,6 +4806,21 @@ function drawHulk(){
     limbG(shX, shY, ex, ey, uR * 1.55, uR * 0.95, sk); /* 어깨에서 굵게 시작 → 삼각근 일체형 */
     limbG(ex, ey, wx, wy, fR, wR, sk);
     deltoid(front, shX, shY);
+    /* 분노: 팔 감마 크랙 */
+    if (raging && front) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(170,255,95,' + (0.4 + Math.sin(G.time * 8 + 1.5) * 0.2) + ')';
+      ctx.lineWidth = outW * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(lerp2(shX, ex, 0.15), lerp2(shY, ey, 0.15));
+      ctx.lineTo(lerp2(shX, ex, 0.45) + uR * 0.35, lerp2(shY, ey, 0.45));
+      ctx.lineTo(lerp2(shX, ex, 0.75) - uR * 0.2, lerp2(shY, ey, 0.75));
+      ctx.moveTo(lerp2(ex, wx, 0.25), lerp2(ey, wy, 0.25));
+      ctx.lineTo(lerp2(ex, wx, 0.6) + fR * 0.3, lerp2(ey, wy, 0.6));
+      ctx.stroke();
+      ctx.restore();
+    }
     /* 이두박근 라인 */
     if (front) {
       ctx.save();
@@ -4837,7 +4853,7 @@ function drawHulk(){
     if (puncher && punchPh > 0.2) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = raging ? 'rgba(255,150,110,.3)' : 'rgba(205,235,130,.3)';
+      ctx.fillStyle = raging ? 'rgba(190,255,120,.35)' : 'rgba(205,235,130,.3)';
       for (const f of [0.5, 0.72]) {
         ctx.beginPath();
         ctx.arc(shX + (fcx - shX) * f, shY + (fcy - shY) * f, fiR * (0.65 + f * 0.35), 0, 7);
@@ -4957,7 +4973,7 @@ function drawHulk(){
         /* 내려찍기 잔상 */
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = raging ? 'rgba(255,150,110,.28)' : 'rgba(205,235,130,.28)';
+        ctx.fillStyle = raging ? 'rgba(190,255,120,.32)' : 'rgba(205,235,130,.28)';
         for (const f of [0.4, 0.7]) {
           ctx.beginPath();
           ctx.arc(lerp2(up[0], M[0], f), lerp2(up[1], M[1], f), bodyW * 0.24, 0, 7);
@@ -5077,6 +5093,28 @@ function drawHulk(){
     ctx.quadraticCurveTo(-bodyW * 0.1, yHip - torsoH * 0.09, bodyW * 0.05, yHip - torsoH * 0.03);
     ctx.stroke();
     ctx.restore();
+    /* 분노: 몸에 맥동하는 감마 크랙 */
+    if (raging) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(170,255,95,' + (0.45 + Math.sin(G.time * 8) * 0.22) + ')';
+      ctx.lineWidth = outW * 0.55;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(bodyW * 0.05, ySh + torsoH * 0.16);
+      ctx.lineTo(bodyW * 0.17, ySh + torsoH * 0.32);
+      ctx.lineTo(bodyW * 0.08, ySh + torsoH * 0.5);
+      ctx.lineTo(bodyW * 0.18, ySh + torsoH * 0.66);
+      ctx.moveTo(-bodyW * 0.24, ySh + torsoH * 0.26);
+      ctx.lineTo(-bodyW * 0.1, ySh + torsoH * 0.44);
+      ctx.lineTo(-bodyW * 0.18, ySh + torsoH * 0.6);
+      ctx.moveTo(bodyW * 0.34, ySh + torsoH * 0.42);
+      ctx.lineTo(bodyW * 0.26, ySh + torsoH * 0.58);
+      ctx.moveTo(-bodyW * 0.05, yTrap + torsoH * 0.1);
+      ctx.lineTo(bodyW * 0.07, ySh + torsoH * 0.1);
+      ctx.stroke();
+      ctx.restore();
+    }
     /* 승모근 + 전면 림라이트 */
     ctx.save();
     ctx.strokeStyle = 'rgba(215,245,160,.45)';
@@ -5217,12 +5255,12 @@ function drawHulk(){
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const eg = ctx.createRadialGradient(hx + headR * 0.56, eyeY, 1, hx + headR * 0.56, eyeY, headR * 0.26);
-    eg.addColorStop(0, raging ? 'rgba(255,200,120,.5)' : 'rgba(190,255,120,.42)');
+    eg.addColorStop(0, raging ? 'rgba(220,255,110,.7)' : 'rgba(190,255,120,.42)');
     eg.addColorStop(1, 'rgba(120,255,110,0)');
     ctx.fillStyle = eg;
     ctx.fillRect(hx + headR * 0.3, eyeY - headR * 0.26, headR * 0.52, headR * 0.52);
     ctx.restore();
-    ctx.fillStyle = raging ? '#ffe089' : '#d9f26a';
+    ctx.fillStyle = raging ? '#e8ff5e' : '#d9f26a';
     ctx.beginPath();
     ctx.moveTo(hx + headR * 0.36, eyeY + headR * 0.05);
     ctx.lineTo(hx + headR * 0.5, eyeY - headR * 0.075);
