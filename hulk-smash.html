@@ -975,6 +975,8 @@ const G = {
   rageRamp: 0,           // 변신 팽창 애니메이션 0~1
   rageGrinT: 0,          // 변신 직후 씩 웃는 표정
   hurtT: 0,              // 피격 붉은 화면 연출
+  defeatT: 0,            // 쓰러짐 연출 타이머
+  defeatDusted: false,
   clearT: 0,
   time: 0,
   camX: 0,
@@ -1490,17 +1492,24 @@ function hulkKnock(dir, dmg){
   updateHpHUD();
   if (H.hp <= 0) hulkDown();
 }
-/* HP 0: 쓰러지고 재도전 */
+/* HP 0: 슬로모션 쓰러짐 연출 후 재도전 */
 function hulkDown(){
   if (G.state !== 'play') return;
   G.state = 'defeat';
+  G.defeatT = 0;
+  G.defeatDusted = false;
   G.rageT = 0;
-  if (!reducedMotion) G.slowMo = 0.4;
-  shake(20);
-  G.flash = 0.15;
+  /* 진행 중이던 액션 정리 */
+  H.spinT = 0; H.stompN = 0; H.punchT = 0; H.clapT = 0; H.dashT = 0; H.roarT = 0; H.slam = 0;
+  if (!reducedMotion) G.slowMo = 0.6;
+  shake(24);
+  G.flash = 0.2;
+  G.hurtT = 0.6;
+  zoomKick(0.08);
+  popup(H.x, GROUND - hulkH() - 80, '헐크 다운!!', 46, '#ff5a4a');
   SND.roar(); SND.bigBoom();
   BGM.duck(0.05);
-  setTimeout(() => { if (G.state === 'defeat') ui.defeatOv.classList.add('on'); }, 1100);
+  setTimeout(() => { if (G.state === 'defeat') ui.defeatOv.classList.add('on'); }, 1900);
 }
 /* 범위·데미지로 보스 타격. srcField로 파동/돌진 중복 타격 방지 */
 function hitBoss(lo, hi, dmg, srcId, srcField){
@@ -2289,7 +2298,19 @@ function update(dt){
   }
   /* Z 꾹 누르면 무자비 연타 */
   if (G.state === 'play' && input.punch) doPunch();
-  if (G.state !== 'play' && G.state !== 'clearing') return;
+  const defeated = G.state === 'defeat';
+  if (G.state !== 'play' && G.state !== 'clearing' && !defeated) return;
+  /* 쓰러짐 연출: 서서히 무너지고 바닥에 쿵 */
+  if (defeated) {
+    G.defeatT += dt;
+    if (!G.defeatDusted && G.defeatT > 0.85) {
+      G.defeatDusted = true;
+      spawnDust(H.x, GROUND, 14, 100);
+      addRing(H.x, GROUND, 130, '#fff8e7', 4);
+      shake(18);
+      SND.land();
+    }
+  }
 
   /* 쿨다운 */
   H.punchCd = Math.max(0, H.punchCd - dt);
@@ -2385,6 +2406,7 @@ function update(dt){
     H.vx = mv * spd;
   }
 
+  if (defeated && H.knockT <= 0) H.vx = 0; /* 쓰러진 채 (마지막 넉백 미끄러짐만 허용) */
   H.x += H.vx * dt;
   H.x = clamp(H.x, 60, G.worldLen - 60);
 
@@ -2417,7 +2439,7 @@ function update(dt){
       if (H.slam === 2) { H.slam = 0; slamImpact(); }
       else {
         /* 착지: 낙하 속도에 비례한 크라우치와 미니 슬램 충격파 */
-        const hard = fallSpeed > 750;
+        const hard = fallSpeed > 750 && !defeated;
         H.landT = hard ? 0.26 : 0.16;
         SND.land();
         spawnDust(H.x, GROUND, hard ? 12 : 5, hard ? 60 : 30);
@@ -2469,8 +2491,8 @@ function update(dt){
     }
   }
 
-  /* 보스 */
-  if (G.boss) updateBoss(dt);
+  /* 보스 (헐크가 쓰러진 동안엔 정지) */
+  if (G.boss && !defeated) updateBoss(dt);
   if (G.projs.length) updateProjs(dt);
   if (G.hurls.length) updateHurls(dt);
 
@@ -3613,6 +3635,18 @@ function render(){
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, W, Hpx);
 
+  /* 쓰러짐: 화면이 점점 어두워지며 붉은 조리개 */
+  if (G.state === 'defeat') {
+    const dp = Math.min(1, (G.defeatT || 0) / 1.7);
+    ctx.fillStyle = 'rgba(10,8,14,' + (dp * 0.42) + ')';
+    ctx.fillRect(0, 0, W, Hpx);
+    const dg2 = ctx.createRadialGradient(W / 2, Hpx / 2, Hpx * (0.55 - dp * 0.2), W / 2, Hpx / 2, Hpx * 0.9);
+    dg2.addColorStop(0, 'rgba(160,20,15,0)');
+    dg2.addColorStop(1, 'rgba(160,20,15,' + (0.25 + dp * 0.25) + ')');
+    ctx.fillStyle = dg2;
+    ctx.fillRect(0, 0, W, Hpx);
+  }
+
   /* 피격 붉은 테두리 */
   if (G.hurtT > 0) {
     const ha = (G.hurtT / 0.4) * 0.4;
@@ -4457,8 +4491,11 @@ function drawHulk(){
   ctx.scale(H.face, 1);
   /* 토네이도 스핀: 좌우 반전을 빠르게 오가며 회전 표현 */
   if (spinning) ctx.scale(Math.sin(H.spinT * 26) >= 0 ? 1 : -1, 1);
-  /* 쓰러짐 */
-  if (G.state === 'defeat') ctx.rotate(1.35);
+  /* 쓰러짐: 이징 회전 낙하 */
+  if (G.state === 'defeat') {
+    const dp = Math.min(1, (G.defeatT || 0) / 0.9);
+    ctx.rotate(1.45 * (1 - Math.pow(1 - dp, 3)));
+  }
   /* 피격 무적 깜빡임 */
   if (H.invulnT > 0 && G.state === 'play' && Math.floor(H.invulnT * 14) % 2 === 0) {
     ctx.globalAlpha = 0.55;
@@ -5078,7 +5115,7 @@ function loop(now){
   let dt = rawDt;
   if (G.hitStop > 0) { G.hitStop -= rawDt; dt = 0; }
   else if (G.slowMo > 0) { G.slowMo -= rawDt; dt = rawDt * 0.35; }
-  if (G.state === 'play' || G.state === 'clearing') {
+  if (G.state === 'play' || G.state === 'clearing' || G.state === 'defeat') {
     if (dt > 0) update(dt);
   } else {
     pressQueue.length = 0;
