@@ -240,9 +240,9 @@
 
     <div id="skills">
       <div class="skill chip" id="sk-punch"><span class="key">Z</span><div class="name">주먹</div><div class="cd"></div></div>
-      <div class="skill chip locked" id="sk-slam"><span class="key">X</span><div class="name">슬램</div><div class="cd"></div></div>
-      <div class="skill chip locked" id="sk-clap"><span class="key">C</span><div class="name">천둥박수</div><div class="cd"></div></div>
-      <div class="skill chip locked" id="sk-dash"><span class="key">V</span><div class="name">돌진</div><div class="cd"></div></div>
+      <div class="skill chip locked" id="sk-slam"><span class="key">X</span><div class="name">메테오</div><div class="cd"></div></div>
+      <div class="skill chip locked" id="sk-clap"><span class="key">C</span><div class="name">낙뢰</div><div class="cd"></div></div>
+      <div class="skill chip locked" id="sk-dash"><span class="key">V</span><div class="name">혜성돌진</div><div class="cd"></div></div>
       <div class="skill chip locked" id="sk-rage"><span class="key">R</span><div class="name">분노</div><div id="rageFill"></div></div>
     </div>
     <div id="muteBtn" class="chip" title="소리 켜기/끄기 (M)">🔊</div>
@@ -255,9 +255,9 @@
     <div class="tbtn" id="tRight">▶</div>
     <div class="tbtn" id="tJump">점프</div>
     <div class="tbtn" id="tPunch">주먹!</div>
-    <div class="tbtn tskill locked" id="tSlam">슬램</div>
-    <div class="tbtn tskill locked" id="tClap">박수</div>
-    <div class="tbtn tskill locked" id="tDash">돌진</div>
+    <div class="tbtn tskill locked" id="tSlam">메테오</div>
+    <div class="tbtn tskill locked" id="tClap">낙뢰</div>
+    <div class="tbtn tskill locked" id="tDash">혜성</div>
     <div class="tbtn tskill locked" id="tRage">분노</div>
   </div>
 
@@ -270,9 +270,9 @@
         <span class="kb">← →</span><span>이동</span>
         <span class="kb">↑</span><span>점프</span>
         <span class="kb">Z / SPACE</span><span>주먹 연타 — 꾹 누르면 잽·훅·해머 콤보</span>
-        <span class="kb locked">X</span><span class="locked-row">슬램 — STAGE 2 해제</span>
-        <span class="kb locked">C</span><span class="locked-row">천둥박수 — STAGE 3 해제</span>
-        <span class="kb locked">V</span><span class="locked-row">돌진 — STAGE 4 해제</span>
+        <span class="kb locked">X</span><span class="locked-row">메테오 슬램 — STAGE 2 해제</span>
+        <span class="kb locked">C</span><span class="locked-row">낙뢰 박수 — STAGE 3 해제</span>
+        <span class="kb locked">V</span><span class="locked-row">혜성 돌진 — STAGE 4 해제</span>
         <span class="kb locked">R</span><span class="locked-row">분노 폭발 — STAGE 5 해제</span>
       </div>
       <button class="bigbtn" id="startBtn">부수러 가기!</button>
@@ -387,6 +387,7 @@ function makePuff(core, edge){
 const PUFF_LIGHT = makePuff('rgba(226,219,202,.9)', 'rgba(226,219,202,0)');
 const PUFF_DARK  = makePuff('rgba(62,58,54,.85)', 'rgba(62,58,54,0)');
 const PUFF_FIRE  = makePuff('rgba(255,190,80,.95)', 'rgba(255,80,15,0)');
+const PUFF_GREEN = makePuff('rgba(180,240,110,.95)', 'rgba(70,180,60,0)');
 /* 아스팔트 노이즈 텍스처 */
 const ROAD_TEX = (() => {
   const c = document.createElement('canvas');
@@ -418,7 +419,7 @@ function initAudio(){
     comp.ratio.value = 5; comp.attack.value = 0.003; comp.release.value = 0.18;
     comp.connect(AC.destination);
     master = AC.createGain();
-    master.gain.value = muted ? 0 : 0.5;
+    master.gain.value = muted ? 0 : 0.62;
     master.connect(comp);
     sfxBus = AC.createGain(); sfxBus.connect(master);
     bgmBus = AC.createGain(); bgmBus.gain.value = 0; bgmBus.connect(master);
@@ -481,9 +482,10 @@ function pTone(o){
 const SND = {
   punch(){
     const r = rand(0.9, 1.18);
-    pTone({type:'sine', f0:165*r, f1:38, dur:0.14, vol:0.55});
-    pTone({type:'triangle', f0:330*r, f1:95, dur:0.09, vol:0.28});
-    pNoise({dur:0.07, type:'bandpass', f0:950*r, vol:0.4});
+    pTone({type:'sine', f0:165*r, f1:34, dur:0.16, vol:0.8, dist:true});
+    pTone({type:'triangle', f0:330*r, f1:95, dur:0.09, vol:0.4});
+    pNoise({dur:0.08, type:'bandpass', f0:950*r, vol:0.5});
+    pNoise({dur:0.05, type:'lowpass', f0:400, vol:0.4});
   },
   crash(){
     const r = rand(0.85, 1.2);
@@ -570,12 +572,22 @@ const SND = {
   whoosh(){
     pNoise({dur:0.13, type:'bandpass', f0:480, f1:2100, vol:0.24});
   },
+  thunder(){
+    pNoise({dur:0.06, type:'highpass', f0:3400, vol:0.6});
+    pTone({type:'sawtooth', f0:1800, f1:55, dur:0.16, vol:0.2, dist:true});
+    pNoise({when:0.05, dur:0.7, type:'lowpass', f0:900, f1:120, vol:0.55});
+    pTone({when:0.02, type:'sine', f0:95, f1:28, dur:0.5, vol:0.6});
+  },
+  sonic(){
+    pNoise({dur:0.3, type:'bandpass', f0:2300, f1:280, vol:0.5});
+    pTone({type:'sine', f0:145, f1:34, dur:0.3, vol:0.6, dist:true});
+  },
   punchHeavy(){
     const r = rand(0.92, 1.1);
-    pTone({type:'sine', f0:130*r, f1:28, dur:0.2, vol:0.75, dist:true});
-    pTone({type:'triangle', f0:250*r, f1:70, dur:0.13, vol:0.32});
-    pNoise({dur:0.16, type:'lowpass', f0:620, vol:0.5});
-    pNoise({dur:0.08, type:'bandpass', f0:1400*r, vol:0.3});
+    pTone({type:'sine', f0:130*r, f1:24, dur:0.24, vol:1.0, dist:true});
+    pTone({type:'triangle', f0:250*r, f1:65, dur:0.14, vol:0.42});
+    pNoise({dur:0.2, type:'lowpass', f0:620, vol:0.65});
+    pNoise({dur:0.08, type:'bandpass', f0:1400*r, vol:0.35});
   },
 };
 
@@ -739,9 +751,12 @@ const G = {
   hitStop: 0,
   slowMo: 0,
   camKick: 0,
+  zoomKick: 0,
   bursts: [],
   wrecks: [],
   remains: [],
+  bolts: [],
+  pendingBolts: [],
   stars: null,
   skyCols: null,
   rage: 0,               // 0~100 게이지
@@ -860,7 +875,7 @@ const ui = {
 function toggleMute(){
   muted = !muted;
   ui.muteBtn.textContent = muted ? '🔇' : '🔊';
-  if (AC && master) master.gain.setTargetAtTime(muted ? 0 : 0.5, AC.currentTime, 0.05);
+  if (AC && master) master.gain.setTargetAtTime(muted ? 0 : 0.62, AC.currentTime, 0.05);
 }
 ui.muteBtn.addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); toggleMute(); });
 $('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); togglePause(); });
@@ -906,7 +921,8 @@ function genStage(n){
   G.particles = []; G.popups = []; G.waves = []; G.rings = [];
   G.emitters = []; G.cracks = [];
   G.bursts = []; G.wrecks = []; G.remains = [];
-  G.hitStop = 0; G.slowMo = 0; G.camKick = 0;
+  G.bolts = []; G.pendingBolts = [];
+  G.hitStop = 0; G.slowMo = 0; G.camKick = 0; G.zoomKick = 0;
   G.destroyed = 0; G.stageScore = 0; G.stageDestroyed = 0;
   G.combo = 0; G.comboT = 0; G.maxCombo = 0;
   G.rageT = 0; G.clearT = 0;
@@ -1030,7 +1046,12 @@ function addCrack(x, r){
 }
 function shake(amt){
   if (reducedMotion) amt *= 0.25;
-  G.shake = Math.min(G.shake + amt, 42);
+  G.shake = Math.min(G.shake + amt, 55);
+}
+/* 임팩트 순간 화면이 훅 당겨지는 줌 킥 */
+function zoomKick(amt){
+  if (reducedMotion) return;
+  G.zoomKick = Math.min(G.zoomKick + amt, 0.12);
 }
 /* 히트스톱: 타격 순간 프레임 정지 (분노 중엔 짧게) */
 function impact(sec){
@@ -1084,6 +1105,29 @@ function spawnShards(x, y, count){
     t: 0, life: rand(0.5, 0.9), type: 'shard',
   });
 }
+/* 낙뢰 (하늘에서 번개 내리꽂기) */
+function spawnBolt(x){
+  const top = GROUND - 640;
+  const segs = [];
+  const n = 8;
+  for (let i = 0; i <= n; i++) {
+    const yy = top + (GROUND - top) * (i / n);
+    const xx = (i === 0 || i === n) ? x : x + rand(-44, 44);
+    segs.push([xx, yy]);
+  }
+  G.bolts.push({ segs, t: 0, life: 0.22 });
+  const dmg = Math.ceil(power() * 2) * (G.rageT > 0 ? 2 : 1);
+  for (const o of objectsInRange(x - 75, x + 75)) {
+    damageObj(o, dmg, clamp(x, o.x, o.x + o.w), true);
+  }
+  addBurst(x, GROUND - 30, 72);
+  spawnSparks(x, GROUND - 18, 1, 6);
+  spawnSparks(x, GROUND - 18, -1, 6);
+  G.flash = Math.max(G.flash, 0.08);
+  shake(10);
+  impact(0.03);
+  SND.thunder();
+}
 /* 파괴 흔적 */
 function addScorch(x, w){
   G.remains.push({ kind: 'scorch', x, w });
@@ -1105,9 +1149,9 @@ function spawnWreck(o, dir){
   G.wrecks.push({
     type: o.type, w: o.w, h,
     x: o.x + o.w / 2, y: GROUND - h / 2,
-    vx: dir * rand(380, 680) + H.vx * 0.4,
-    vy: -rand(320, 560),
-    rot: 0, vr: dir * rand(3.5, 8),
+    vx: dir * rand(470, 840) + H.vx * 0.4,
+    vy: -rand(390, 660),
+    rot: 0, vr: dir * rand(4.5, 10),
     color: o.color, carColor: o.carColor,
     t: 0, life: rand(1.3, 1.7),
   });
@@ -1132,15 +1176,16 @@ function damageObj(o, dmg, hitX, big){
   const topY = GROUND - o.h;
   if (o.hp > 0) {
     const dir = (o.x + o.w / 2) >= H.x ? 1 : -1;
-    popup(hitX, topY - rand(6, 40), pick(HIT_WORDS), 26 + Math.min(dmg * 2, 16), '#fff8e7');
-    addBurst(hitX, GROUND - Math.min(o.h * 0.5, 85), 26 + Math.min(dmg * 3, 22));
-    spawnSparks(hitX, GROUND - Math.min(o.h * 0.45, 75), dir, 6);
-    spawnDebris(o.x, GROUND, o.w, o.h, objDebrisColor(o), 6, 210, dir);
-    if (o.type === 'building') spawnShards(hitX, GROUND - Math.min(o.h * 0.5, 90), 5);
-    impact(0.035);
-    G.camKick += dir * 5;
+    popup(hitX, topY - rand(6, 40), pick(HIT_WORDS), 30 + Math.min(dmg * 2, 18), '#fff8e7');
+    addBurst(hitX, GROUND - Math.min(o.h * 0.5, 85), 34 + Math.min(dmg * 3, 26));
+    spawnSparks(hitX, GROUND - Math.min(o.h * 0.45, 75), dir, 9);
+    spawnDebris(o.x, GROUND, o.w, o.h, objDebrisColor(o), 10, 280, dir);
+    if (o.type === 'building') spawnShards(hitX, GROUND - Math.min(o.h * 0.5, 90), 7);
+    impact(0.05);
+    G.camKick += dir * 9;
+    zoomKick(0.02);
     if (o.type === 'building') SND.glass(); else SND.crash();
-    shake(4);
+    shake(7);
   } else {
     destroyObj(o, big);
   }
@@ -1166,16 +1211,17 @@ function destroyObj(o, big){
   const dir = cx >= H.x ? 1 : -1;
 
   const isBig = T.big;
-  popup(cx, topY - 30, isBig ? pick(BIG_WORDS) : pick(BREAK_WORDS), isBig ? 44 : 32, '#ffd23f');
-  popup(cx + rand(-40, 40), topY - 90, '+' + gain, 22, '#fff8e7');
-  if (G.combo >= 3) popup(H.x, GROUND - hulkH() - 60, G.combo + ' 연속 파괴!', 24 + Math.min(G.combo, 20), '#ff4b33');
+  popup(cx, topY - 30, isBig ? pick(BIG_WORDS) : pick(BREAK_WORDS), isBig ? 54 : 38, '#ffd23f');
+  popup(cx + rand(-40, 40), topY - 100, '+' + gain, 24, '#fff8e7');
+  if (G.combo >= 3) popup(H.x, GROUND - hulkH() - 60, G.combo + ' 연속 파괴!', 28 + Math.min(G.combo * 1.5, 30), '#ff4b33');
 
-  addBurst(cx, GROUND - Math.min(o.h * 0.55, 110), isBig ? 90 : 52);
-  spawnSparks(cx, GROUND - Math.min(o.h * 0.4, 80), dir, isBig ? 14 : 8);
-  spawnDebris(o.x, GROUND, o.w, o.h, objDebrisColor(o), isBig ? 30 : 14, isBig ? 430 : 300, dir);
+  addBurst(cx, GROUND - Math.min(o.h * 0.55, 110), isBig ? 110 : 64);
+  spawnSparks(cx, GROUND - Math.min(o.h * 0.4, 80), dir, isBig ? 20 : 12);
+  spawnDebris(o.x, GROUND, o.w, o.h, objDebrisColor(o), isBig ? 45 : 22, isBig ? 560 : 380, dir);
   spawnDust(cx, GROUND, isBig ? 18 : 8, o.w / 2);
-  impact(isBig ? 0.09 : 0.05);
-  G.camKick += dir * (isBig ? 15 : 8);
+  impact(isBig ? 0.14 : 0.08);
+  G.camKick += dir * (isBig ? 26 : 14);
+  zoomKick(isBig ? 0.06 : 0.03);
 
   if (o.type === 'building') {
     o.dying = 0.0001; /* 제자리 붕괴 */
@@ -1210,8 +1256,8 @@ function destroyObj(o, big){
   ui.scoreBox.classList.remove('bump');
   void ui.scoreBox.offsetWidth;
   ui.scoreBox.classList.add('bump');
-  shake(isBig ? 18 : 8);
-  if (isBig) G.flash = 0.12;
+  shake(isBig ? 28 : 14);
+  G.flash = Math.max(G.flash, isBig ? 0.16 : 0.05);
 
   /* 분노 게이지 */
   if (hasSkill('rage') && G.rageT <= 0) {
@@ -1259,7 +1305,9 @@ function doPunch(){
     if (heavy) {
       addRing(H.x + H.face * range * 0.5, GROUND, 100, '#ffd23f', 6);
       spawnDust(H.x + H.face * range * 0.5, GROUND, 6, 44);
-      impact(0.055);
+      impact(0.09);
+      zoomKick(0.05);
+      shake(13);
     }
   } else {
     SND.whoosh();
@@ -1273,25 +1321,35 @@ function doJump(){
 function doSlam(){
   if (!hasSkill('slam') || H.slamCd > 0 || H.slam || H.dashT > 0 || H.clapT > 0) return;
   H.slam = 1; H.slamCd = 2.6; H.onGround = false;
-  H.vy = -880;
-  H.vx = H.face * 160;
+  H.vy = -1000;
+  H.vx = H.face * 180;
   SND.jump();
-  popup(H.x, GROUND - hulkH() - 40, '슬램!!', 30, '#ffd23f');
+  popup(H.x, GROUND - hulkH() - 40, '메테오 슬램!!', 30, '#ffd23f');
 }
 function slamImpact(){
-  const r = (210 + G.stage * 14) * (G.rageT > 0 ? 1.3 : 1);
+  const r = (230 + G.stage * 15) * (G.rageT > 0 ? 1.3 : 1);
   const dmg = power() * 2 * (G.rageT > 0 ? 2 : 1);
   for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
   addRing(H.x, GROUND, r, '#ffd23f', 8);
-  addBurst(H.x, GROUND - 28, 80);
-  spawnSparks(H.x, GROUND - 18, 1, 8);
-  spawnSparks(H.x, GROUND - 18, -1, 8);
+  addRing(H.x, GROUND, r * 0.55, '#fff8e7', 5);
+  addBurst(H.x, GROUND - 28, 90);
+  fireball(H.x, GROUND - 18, true);
+  addScorch(H.x, 140);
+  spawnSparks(H.x, GROUND - 18, 1, 9);
+  spawnSparks(H.x, GROUND - 18, -1, 9);
   addCrack(H.x, r * 0.7);
   spawnDust(H.x, GROUND, 22, r * 0.5);
-  impact(0.1);
+  /* 양방향 여진 지진파 */
+  for (const d of [1, -1]) G.waves.push({
+    x: H.x, dir: d, traveled: r * 0.3,
+    range: r + 200 + G.stage * 12, speed: 750,
+    id: Math.random(), dmg: Math.max(1, Math.ceil(power() * 0.8)), gold: true,
+  });
+  impact(0.14);
+  zoomKick(0.08);
   SND.clap(); SND.land();
-  shake(22);
-  G.flash = 0.1;
+  shake(32);
+  G.flash = 0.12;
 }
 function doClap(){
   if (!hasSkill('clap') || H.clapCd > 0 || H.clapT > 0 || H.slam || H.dashT > 0) return;
@@ -1305,22 +1363,27 @@ function doClap(){
     id: Math.random(),
     dmg: Math.ceil(power() * 1.6) * (G.rageT > 0 ? 2 : 1),
   });
+  /* 전방 경로에 낙뢰 3연격 */
+  for (let i = 0; i < 3; i++) {
+    G.pendingBolts.push({ x: H.x + dir * (170 + i * 160 + rand(-30, 30)), delay: 0.12 + i * 0.1 });
+  }
   SND.clap();
   shake(10);
-  popup(H.x + dir * 90, GROUND - hulkH() - 30, '천둥박수!!', 32, '#39a9db');
+  popup(H.x + dir * 90, GROUND - hulkH() - 30, '낙뢰 박수!!', 32, '#39a9db');
 }
 function doDash(){
   if (!hasSkill('dash') || H.dashCd > 0 || H.dashT > 0 || H.slam || H.clapT > 0) return;
   H.dashT = 0.5; H.dashCd = 5;
   H.dashId = Math.random();
   SND.dash(); SND.roar();
-  popup(H.x, GROUND - hulkH() - 40, '돌진!!!', 32, '#ff4b33');
+  popup(H.x, GROUND - hulkH() - 40, '혜성 돌진!!!', 32, '#9fe36a');
 }
 function doRage(){
   if (!hasSkill('rage') || G.rage < 100 || G.rageT > 0) return;
   G.rage = 0; G.rageT = 8;
   SND.roar(); SND.bigBoom();
-  shake(20);
+  shake(26);
+  zoomKick(0.1);
   G.flash = 0.2;
   addRing(H.x, GROUND - hulkH() / 2, 380, '#ff4b33', 10);
   popup(H.x, GROUND - hulkH() - 80, '헐크 스매쉬!!!!', 52, '#ff4b33');
@@ -1375,8 +1438,26 @@ function update(dt){
       o.lastDash = H.dashId;
       damageObj(o, power() * 3 * (G.rageT > 0 ? 2 : 1), o.x + o.w / 2, true);
     }
-    if (!reducedMotion && Math.random() < 0.6) {
-      spawnDust(H.x - H.face * 30, GROUND, 2, 20);
+    /* 녹색 혜성 트레일 */
+    if (!reducedMotion && G.particles.length < 320) {
+      for (let i = 0; i < 2; i++) G.particles.push({
+        x: H.x - H.face * rand(6, 55), y: GROUND - hulkH() * rand(0.15, 0.85),
+        vx: -H.face * rand(30, 100), vy: rand(-35, 35),
+        size: rand(12, 24), color: '', rot: 0, vr: 0,
+        t: 0, life: rand(0.22, 0.42), type: 'gtrail',
+      });
+      if (Math.random() < 0.6) spawnDust(H.x - H.face * 30, GROUND, 1, 20);
+    }
+    /* 돌진 종료: 소닉붐 피니시 */
+    if (H.dashT <= 0) {
+      const bx = H.x + H.face * 90;
+      addBurst(bx, GROUND - 60, 85);
+      addRing(bx, GROUND - 30, 160, '#9fe36a', 7);
+      const lo = Math.min(H.x, H.x + H.face * 240), hi = Math.max(H.x, H.x + H.face * 240);
+      for (const o of objectsInRange(lo, hi)) damageObj(o, power(), o.x + o.w / 2, true);
+      SND.sonic();
+      shake(9);
+      impact(0.04);
     }
   } else if (H.clapT > 0) {
     H.vx = 0;
@@ -1401,6 +1482,15 @@ function update(dt){
   if (!H.onGround) {
     H.vy += (H.slam === 2 ? 4200 : 1900) * dt;
     if (H.slam === 1 && H.vy > -80) { H.slam = 2; H.vy = 300; }
+    /* 메테오 낙하 화염 트레일 */
+    if (H.slam === 2 && !reducedMotion && G.particles.length < 320) {
+      G.particles.push({
+        x: H.x + rand(-16, 16), y: H.y - hulkH() * rand(0.2, 0.8),
+        vx: rand(-25, 25), vy: -rand(20, 90),
+        size: rand(10, 18), color: '', rot: 0, vr: 0,
+        t: 0, life: rand(0.2, 0.4), type: 'fire',
+      });
+    }
     H.y += H.vy * dt;
     if (H.y >= GROUND) {
       H.y = GROUND; H.vy = 0; H.onGround = true;
@@ -1409,7 +1499,7 @@ function update(dt){
     }
   }
 
-  /* 분노 접촉 파괴 */
+  /* 분노 접촉 파괴 + 불티 오라 */
   if (G.rageT > 0) {
     H.rageTick -= dt;
     if (H.rageTick <= 0) {
@@ -1419,7 +1509,24 @@ function update(dt){
         damageObj(o, power() * 2, o.x + o.w / 2, true);
       }
     }
+    if (!reducedMotion && G.particles.length < 320 && Math.random() < 0.55) {
+      G.particles.push({
+        x: H.x + rand(-0.7, 0.7) * hulkW(), y: GROUND - rand(0, hulkH()),
+        vx: rand(-25, 25), vy: -rand(70, 190),
+        size: rand(1.8, 3.5), color: '', rot: 0, vr: 0,
+        t: 0, life: rand(0.4, 0.8), type: 'ember',
+      });
+    }
   }
+
+  /* 낙뢰 스케줄 */
+  for (const pb of G.pendingBolts) {
+    pb.delay -= dt;
+    if (pb.delay <= 0) spawnBolt(pb.x);
+  }
+  G.pendingBolts = G.pendingBolts.filter(pb => pb.delay > 0);
+  for (const bo of G.bolts) bo.t += dt;
+  G.bolts = G.bolts.filter(bo => bo.t < bo.life);
 
   /* 걷기 애니메이션 + 발걸음 먼지·쿵 소리 */
   if (Math.abs(H.vx) > 10 && H.onGround) {
@@ -1459,7 +1566,7 @@ function update(dt){
     p.t += dt;
     const gAcc = p.type === 'dust' ? -60
       : p.type === 'smoke' ? -150
-      : p.type === 'fire' ? -90
+      : (p.type === 'fire' || p.type === 'gtrail') ? -90
       : p.type === 'ember' ? 520
       : (p.type === 'water' || p.type === 'spark') ? 900
       : 1500;
@@ -1531,6 +1638,7 @@ function update(dt){
   for (const b of G.bursts) b.t += dt;
   G.bursts = G.bursts.filter(b => b.t < b.life);
   G.camKick *= Math.exp(-9 * dt);
+  G.zoomKick *= Math.exp(-7 * dt);
 
   /* 날아가는 잔해: 포물선 + 바닥 튕김 */
   for (const wk of G.wrecks) {
@@ -1632,7 +1740,7 @@ function setCd(name, cd, max){
 }
 
 /* ---------- 클리어 ---------- */
-const SKILL_NAMES = { slam: '슬램 (X)', clap: '천둥박수 (C)', dash: '돌진 (V)', rage: '분노 폭발 (R)' };
+const SKILL_NAMES = { slam: '메테오 슬램 (X)', clap: '낙뢰 박수 (C)', dash: '혜성 돌진 (V)', rage: '분노 폭발 (R)' };
 function showClear(){
   G.state = 'clear';
   SND.fanfare();
@@ -1690,6 +1798,12 @@ function render(){
     shy = rand(-G.shake, G.shake) * viewScale * 0.5;
   }
   ctx.translate(shx, shy);
+  /* 줌 킥: 화면 중심 기준 순간 확대 */
+  if (G.zoomKick > 0.001) {
+    ctx.translate(W / 2, Hpx / 2);
+    ctx.scale(1 + G.zoomKick, 1 + G.zoomKick);
+    ctx.translate(-W / 2, -Hpx / 2);
+  }
   ctx.scale(viewScale, viewScale);
 
   /* 해/달 + 글로우 */
@@ -1929,16 +2043,46 @@ function render(){
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
-  /* 천둥박수 파면 */
+  /* 충격 파면 (박수: 파랑 / 슬램 여진: 황금) */
   for (const w of G.waves) {
     const front = w.x + w.dir * w.traveled;
     const wg2 = ctx.createRadialGradient(front, GROUND - 40, 5, front, GROUND - 40, 80);
-    wg2.addColorStop(0, 'rgba(200,235,255,.75)');
-    wg2.addColorStop(1, 'rgba(57,169,219,0)');
+    if (w.gold) {
+      wg2.addColorStop(0, 'rgba(255,235,170,.7)');
+      wg2.addColorStop(1, 'rgba(255,170,50,0)');
+    } else {
+      wg2.addColorStop(0, 'rgba(200,235,255,.75)');
+      wg2.addColorStop(1, 'rgba(57,169,219,0)');
+    }
     ctx.fillStyle = wg2;
     ctx.beginPath();
-    ctx.ellipse(front, GROUND - 40, 30, 78, 0, 0, 7);
+    ctx.ellipse(front, GROUND - 40, 30, w.gold ? 46 : 78, 0, 0, 7);
     ctx.fill();
+  }
+
+  /* 낙뢰 */
+  for (const bo of G.bolts) {
+    const a = 1 - bo.t / bo.life;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = a;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(150,200,255,.9)';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    for (let i = 0; i < bo.segs.length; i++) {
+      const pt = bo.segs[i];
+      if (i === 0) ctx.moveTo(pt[0], pt[1]); else ctx.lineTo(pt[0], pt[1]);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    /* 지면 섬광 */
+    const gx = bo.segs[bo.segs.length - 1][0];
+    const gr = 70 * a + 20;
+    ctx.drawImage(PUFF_LIGHT, gx - gr, GROUND - gr * 1.4, gr * 2, gr * 2);
+    ctx.restore();
   }
 
   drawHulk();
@@ -1962,6 +2106,13 @@ function render(){
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = lifeRatio;
       ctx.drawImage(PUFF_FIRE, p.x - ds, p.y - ds, ds * 2, ds * 2);
+      ctx.restore();
+    } else if (p.type === 'gtrail') {
+      const ds = p.size * (1 + p.t * 1.6);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = lifeRatio * 0.9;
+      ctx.drawImage(PUFF_GREEN, p.x - ds, p.y - ds, ds * 2, ds * 2);
       ctx.restore();
     } else if (p.type === 'ember') {
       ctx.save();
