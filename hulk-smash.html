@@ -4624,7 +4624,7 @@ function drawHulk(){
     const kx = hx + Math.sin(thA) * thighL, ky = hy + Math.cos(thA) * thighL;
     const sA = thA - knee;
     const ax = kx + Math.sin(sA) * shinL, ay = ky + Math.cos(sA) * shinL;
-    const thR = bodyW * 0.215, knR = bodyW * 0.135, caR = bodyW * 0.175, anR = bodyW * 0.1;
+    const thR = bodyW * 0.24, knR = bodyW * 0.145, caR = bodyW * 0.19, anR = bodyW * 0.1;
     /* 종아리 */
     limbG(kx, ky, ax, ay, caR, anR, front ? skinF : skinB);
     /* 발 */
@@ -4767,7 +4767,7 @@ function drawHulk(){
     ctx.restore();
   }
   function deltoid(front, shX, shY){
-    const dR = bodyW * (front ? 0.2 : 0.18);
+    const dR = bodyW * (front ? 0.22 : 0.2);
     const dg = ctx.createRadialGradient(shX + dR * 0.25, shY - dR * 0.35, dR * 0.1, shX, shY, dR);
     dg.addColorStop(0, front ? P.hi : P.base);
     dg.addColorStop(0.65, front ? P.base : P.mid);
@@ -4790,9 +4790,9 @@ function drawHulk(){
     const shX = shoulderX(front);
     const shY = shYBase;
     const upL = armLenU * lm, foL = armLenF * lm;
-    const uR = bodyW * (front ? 0.165 : 0.15);
-    const fR = bodyW * (front ? 0.19 : 0.17);
-    const wR = bodyW * (front ? 0.13 : 0.115);
+    const uR = bodyW * (front ? 0.185 : 0.165);
+    const fR = bodyW * (front ? 0.21 : 0.185);
+    const wR = bodyW * (front ? 0.14 : 0.125);
     const sk = front ? skinF : skinB;
     const ex = shX + Math.sin(angU) * upL, ey = shY + Math.cos(angU) * upL;
     const aF = angU + bend;
@@ -4810,6 +4810,16 @@ function drawHulk(){
       ctx.quadraticCurveTo(
         lerp2(shX, ex, 0.55) + Math.cos(angU) * uR * 0.75, lerp2(shY, ey, 0.55) - Math.sin(angU) * uR * 0.75,
         lerp2(shX, ex, 0.85) + Math.cos(angU) * uR * 0.4, lerp2(shY, ey, 0.85) - Math.sin(angU) * uR * 0.4);
+      /* 삼두 라인 (반대편) */
+      ctx.moveTo(lerp2(shX, ex, 0.3) - Math.cos(angU) * uR * 0.55, lerp2(shY, ey, 0.3) + Math.sin(angU) * uR * 0.55);
+      ctx.quadraticCurveTo(
+        lerp2(shX, ex, 0.6) - Math.cos(angU) * uR * 0.7, lerp2(shY, ey, 0.6) + Math.sin(angU) * uR * 0.7,
+        lerp2(shX, ex, 0.88) - Math.cos(angU) * uR * 0.35, lerp2(shY, ey, 0.88) + Math.sin(angU) * uR * 0.35);
+      /* 전완 힘줄 라인 */
+      ctx.moveTo(lerp2(ex, wx, 0.2) + Math.cos(aF) * fR * 0.45, lerp2(ey, wy, 0.2) - Math.sin(aF) * fR * 0.45);
+      ctx.quadraticCurveTo(
+        lerp2(ex, wx, 0.55) + Math.cos(aF) * fR * 0.55, lerp2(ey, wy, 0.55) - Math.sin(aF) * fR * 0.55,
+        lerp2(ex, wx, 0.85) + Math.cos(aF) * fR * 0.3, lerp2(ey, wy, 0.85) - Math.sin(aF) * fR * 0.3);
       ctx.stroke();
       ctx.restore();
     }
@@ -4848,9 +4858,9 @@ function drawHulk(){
   /* ---- IK 팔: 손을 목표점으로 (합장 박수·해머용) ---- */
   function armTo(front, hxT, hyT, elbowSign, palm){
     const shX = shoulderX(front), shY = shYBase;
-    const uR = bodyW * (front ? 0.165 : 0.15);
-    const fR = bodyW * (front ? 0.19 : 0.17);
-    const wR = bodyW * (front ? 0.13 : 0.115);
+    const uR = bodyW * (front ? 0.185 : 0.165);
+    const fR = bodyW * (front ? 0.21 : 0.185);
+    const wR = bodyW * (front ? 0.14 : 0.125);
     let dx = hxT - shX, dy = hyT - shY;
     let dist = Math.hypot(dx, dy) || 1;
     const maxD = armLenU + armLenF - 6;
@@ -4973,11 +4983,11 @@ function drawHulk(){
 
   /* ---- 몸통 (더 넓은 어깨 + 두꺼운 흉근 + 식스팩) ---- */
   function torso(){
-    const hw = bodyW * 0.34, ww = bodyW * 0.38;
-    const lw = bodyW * 0.62, sw = bodyW * 0.56;
+    const hw = bodyW * 0.32, ww = bodyW * 0.35;
+    const lw = bodyW * 0.66, sw = bodyW * 0.6;
     const yHip = hipY, yWaist = hipY - torsoH * 0.24;
     const yLat = hipY - torsoH * 0.6, ySh = hipY - torsoH * 0.92;
-    const yTrap = ySh - torsoH * 0.24;
+    const yTrap = ySh - torsoH * 0.28;
     const tg = ctx.createLinearGradient(-lw, 0, lw * 0.9, 0);
     tg.addColorStop(0, P.deep);
     tg.addColorStop(0.3, P.mid);
@@ -4994,15 +5004,36 @@ function drawHulk(){
     ctx.quadraticCurveTo(hw * 1.04, yHip - 4 * s, hw, yHip + 6 * s);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
-    /* 대흉근 하이라이트 (더 크게) */
+    /* 대흉근: 뚜렷한 판형 볼륨 */
     ctx.save();
-    const pg = ctx.createRadialGradient(bodyW * 0.2, ySh + torsoH * 0.2, bodyW * 0.05,
-                                        bodyW * 0.2, ySh + torsoH * 0.23, bodyW * 0.4);
-    pg.addColorStop(0, 'rgba(190,215,130,.55)');
-    pg.addColorStop(1, 'rgba(190,215,130,0)');
+    const pp = ctx.createLinearGradient(0, ySh + torsoH * 0.04, 0, ySh + torsoH * 0.42);
+    pp.addColorStop(0, P.hi);
+    pp.addColorStop(0.55, P.base);
+    pp.addColorStop(1, P.mid);
+    ctx.fillStyle = pp;
+    ctx.beginPath();
+    ctx.ellipse(bodyW * 0.2, ySh + torsoH * 0.22, bodyW * 0.31, torsoH * 0.19, -0.08, 0, 7);
+    ctx.fill();
+    /* 판 아랫단 크리스프 라인 */
+    ctx.strokeStyle = 'rgba(29,86,25,.6)';
+    ctx.lineWidth = outW * 0.6;
+    ctx.beginPath();
+    ctx.ellipse(bodyW * 0.2, ySh + torsoH * 0.22, bodyW * 0.31, torsoH * 0.19, -0.08, 0.35, 2.6);
+    ctx.stroke();
+    /* 반대편 흉근 힌트 */
+    ctx.strokeStyle = 'rgba(29,86,25,.4)';
+    ctx.lineWidth = outW * 0.5;
+    ctx.beginPath();
+    ctx.arc(-bodyW * 0.14, ySh + torsoH * 0.24, bodyW * 0.2, 0.5, 2.2);
+    ctx.stroke();
+    /* 상단 광택 */
+    const pg = ctx.createRadialGradient(bodyW * 0.22, ySh + torsoH * 0.13, bodyW * 0.04,
+                                        bodyW * 0.22, ySh + torsoH * 0.17, bodyW * 0.3);
+    pg.addColorStop(0, 'rgba(215,245,150,.6)');
+    pg.addColorStop(1, 'rgba(215,245,150,0)');
     ctx.fillStyle = pg;
     ctx.beginPath();
-    ctx.ellipse(bodyW * 0.18, ySh + torsoH * 0.23, bodyW * 0.36, torsoH * 0.19, -0.1, 0, 7);
+    ctx.ellipse(bodyW * 0.2, ySh + torsoH * 0.17, bodyW * 0.28, torsoH * 0.13, -0.08, 0, 7);
     ctx.fill();
     ctx.restore();
     /* 근육 정의선: 흉근·흉골·식스팩·광배·상흉근 */
@@ -5034,15 +5065,27 @@ function drawHulk(){
     /* 옆구리 사선 (외복사근) */
     ctx.moveTo(bodyW * 0.3, ySh + torsoH * 0.62);
     ctx.lineTo(bodyW * 0.24, ySh + torsoH * 0.86);
+    /* 브이컷 (장골 라인) */
+    ctx.moveTo(hw * 0.95, yHip - torsoH * 0.02);
+    ctx.quadraticCurveTo(bodyW * 0.18, yHip - torsoH * 0.1, bodyW * 0.09, yHip - torsoH * 0.03);
+    ctx.moveTo(-hw * 0.85, yHip - torsoH * 0.02);
+    ctx.quadraticCurveTo(-bodyW * 0.1, yHip - torsoH * 0.09, bodyW * 0.05, yHip - torsoH * 0.03);
     ctx.stroke();
     ctx.restore();
-    /* 승모근 림라이트 */
+    /* 승모근 + 전면 림라이트 */
     ctx.save();
-    ctx.strokeStyle = 'rgba(200,225,150,.4)';
+    ctx.strokeStyle = 'rgba(215,245,160,.45)';
     ctx.lineWidth = outW * 0.6;
     ctx.beginPath();
     ctx.moveTo(-sw * 0.8, ySh - torsoH * 0.015);
     ctx.quadraticCurveTo(-bodyW * 0.1, yTrap - torsoH * 0.03, bodyW * 0.15, yTrap + torsoH * 0.04);
+    ctx.stroke();
+    /* 가슴 앞면 실루엣 림 */
+    ctx.strokeStyle = 'rgba(220,255,180,.32)';
+    ctx.lineWidth = outW * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(sw * 0.97, ySh + torsoH * 0.06);
+    ctx.quadraticCurveTo(lw * 1.0, ySh + torsoH * 0.3, ww * 0.97, yWaist);
     ctx.stroke();
     ctx.restore();
     /* 퍼플 새시 + 테크 벨트 (발광 그린 코어) */
