@@ -2194,13 +2194,30 @@ function update(dt){
       H.y = GROUND; H.vy = 0; H.onGround = true;
       if (H.slam === 2) { H.slam = 0; slamImpact(); }
       else {
-        /* 착지: 낙하 속도에 비례한 크라우치와 충격 */
+        /* 착지: 낙하 속도에 비례한 크라우치와 미니 슬램 충격파 */
         const hard = fallSpeed > 750;
         H.landT = hard ? 0.26 : 0.16;
         SND.land();
         spawnDust(H.x, GROUND, hard ? 12 : 5, hard ? 60 : 30);
-        shake(hard ? 8 : 3);
-        if (hard) { addRing(H.x, GROUND, 90, '#fff8e7', 4); impact(0.03); }
+        shake(hard ? 10 : 3);
+        if (hard) {
+          const mult = clamp((fallSpeed - 750) / 900, 0, 1);
+          const r = (140 + 130 * mult) * (0.7 + hulkScale() * 0.3);
+          const dmg = Math.max(1, Math.ceil(power() * (0.6 + 0.7 * mult)) * (G.rageT > 0 ? 2 : 1));
+          for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
+          hitZombies(H.x - r, H.x + r, 0);
+          hitBoss(H.x - r, H.x + r, dmg);
+          for (const d of [1, -1]) G.waves.push({
+            x: H.x, dir: d, traveled: 26, range: r + 60, speed: 850,
+            id: Math.random(), dmg: 1, gold: true,
+          });
+          addRing(H.x, GROUND, r, '#ffd23f', 6);
+          addRing(H.x, GROUND, r * 0.5, '#fff8e7', 4);
+          addCrack(H.x, r * 0.5);
+          impact(0.04 + 0.04 * mult);
+          zoomKick(0.03 * mult);
+          SND.boom();
+        }
       }
     }
   }
