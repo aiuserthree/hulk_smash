@@ -884,7 +884,7 @@ const H = {
   clapT: 0, clapCd: 0,
   dashT: 0, dashCd: 0,
   rageTick: 0,
-  baseH: 128, baseW: 78,
+  baseH: 130, baseW: 88,
 };
 /* 분노 변신 시 덩치 35% 팽창 + 거인화 강화 */
 function hulkScale(){
@@ -1142,6 +1142,7 @@ function genStage(n){
   H.punchSeq = 0; H.punchChainT = 0;
   H.knockT = 0; H.knockVx = 0; H.landT = 0;
   H.quakeCd = 0; H.throwCd = 0; H.roarCd = 0; H.roarT = 0;
+  H.clapHit = false;
   H.maxHp = 100 + 25 * G.upgrades.hp;
   H.hp = H.maxHp; H.invulnT = 0; G.hurtT = 0;
   updateHpHUD();
@@ -1889,8 +1890,12 @@ function slamImpact(){
 function doClap(){
   if (!hasSkill('clap') || H.clapCd > 0 || H.clapT > 0 || H.slam || H.dashT > 0) return;
   H.clapT = 0.5; H.clapCd = 4.5;
+  H.clapHit = false;
+  SND.whoosh(); /* 크게 벌리는 예비 동작 */
+}
+/* 손바닥이 실제로 맞부딪치는 순간 발동 (애니메이션 동기화) */
+function clapImpact(){
   const dir = H.face;
-  /* 합장 박수: 전방을 통째로 날려버리는 폭풍 파면 */
   G.waves.push({
     x: H.x + dir * hulkW() * 0.6,
     dir, traveled: 0,
@@ -1900,14 +1905,15 @@ function doClap(){
     dmg: Math.max(2, Math.ceil(power() * 2.2)) * (G.rageT > 0 ? 2 : 1),
     blast: true,
   });
-  addRing(H.x + dir * 80, GROUND - hulkH() * 0.55, 170, '#c8ecff', 7);
-  addBurst(H.x + dir * hulkW() * 0.7, GROUND - hulkH() * 0.6, 62);
-  spawnDust(H.x + dir * 120, GROUND, 10, 90);
+  addRing(H.x + dir * 60, GROUND - hulkH() * 0.55, 170, '#c8ecff', 7);
+  addRing(H.x + dir * 60, GROUND - hulkH() * 0.55, 90, '#fff8e7', 4);
+  addBurst(H.x + dir * hulkW() * 0.45, GROUND - hulkH() * 0.55, 70);
+  spawnDust(H.x + dir * 130, GROUND, 10, 90);
   SND.clap();
-  shake(14);
-  impact(0.05);
-  zoomKick(0.04);
-  popup(H.x + dir * 90, GROUND - hulkH() - 30, 'THUNDER CLAP!!', 32, '#39a9db');
+  shake(16);
+  impact(0.06);
+  zoomKick(0.05);
+  popup(H.x + dir * 90, GROUND - hulkH() - 30, 'THUNDER CLAP!!', 34, '#39a9db');
 }
 function doDash(){
   if (!hasSkill('dash') || H.dashCd > 0 || H.dashT > 0 || H.slam || H.clapT > 0) return;
@@ -1945,6 +1951,7 @@ function doQuake(){
   const lv = G.actives.quake;
   H.quakeCd = 12 * Math.pow(0.85, lv - 1);
   H.landT = 0.3; /* 내리찍는 크라우치 모션 */
+  H.punchSeq = 2; H.punchDur = 0.34; H.punchT = 0.34; H.punchChainT = 0; /* 양손 내려찍기 */
   const dmg = Math.max(1, Math.round(power() * 2.5 * (1 + 0.4 * (lv - 1)) * (G.rageT > 0 ? 2 : 1)));
   const lo = G.camX - 100, hi = G.camX + viewW + 100;
   for (const o of objectsInRange(lo, hi)) damageObj(o, dmg, o.x + o.w / 2, true);
@@ -2095,6 +2102,11 @@ function update(dt){
   H.punchT = Math.max(0, H.punchT - dt);
   H.punchChainT = Math.max(0, H.punchChainT - dt);
   H.clapT = Math.max(0, H.clapT - dt);
+  /* 합장 박수: 손이 맞부딪치는 프레임에 충격파 발동 */
+  if (H.clapT > 0 && !H.clapHit && H.clapT <= 0.19) {
+    H.clapHit = true;
+    clapImpact();
+  }
 
   if (G.rageT > 0) G.rageT = Math.max(0, G.rageT - dt);
   G.rageRamp += ((G.rageT > 0 ? 1 : 0) - G.rageRamp) * Math.min(1, dt * 6);
@@ -4016,6 +4028,10 @@ function limbG(x1, y1, x2, y2, r1, r2, stops){
   ctx.fill();
   ctx.stroke();
 }
+const lerp2 = (a, b, t) => a + (b - a) * t;
+const easeOut3 = t => 1 - Math.pow(1 - t, 3);
+const easeIn3 = t => t * t * t;
+
 function drawHulk(){
   const s = hulkScale();
   const raging = G.rageT > 0;
@@ -4027,10 +4043,14 @@ function drawHulk(){
             : Math.sin(G.time * 2.1) * 1.6 * s;
   const pd = H.punchDur || 0.2;
   const punchPh = H.punchT > 0 ? Math.sin((pd - H.punchT) / pd * Math.PI) : 0;
+  const punchRaw = H.punchT > 0 ? (pd - H.punchT) / pd : 0; /* 0→1 진행도 */
   const pSeq = H.punchSeq || 0;
   const clapping = H.clapT > 0;
   const clapPh = clapping ? (0.5 - H.clapT) / 0.5 : 0;
   const dashing = H.dashT > 0;
+  /* 양손 합동 모션: 합장 박수 / 해머 내려찍기 */
+  const hammering = punchRaw > 0 && pSeq === 2;
+  const useHands = clapping || hammering;
 
   /* 무비풍 올리브 그린 5톤 — 분노 변신 시 붉은 폭주 형태 */
   const P = raging
@@ -4041,6 +4061,7 @@ function drawHulk(){
   const jeanF = [[0, '#5c6375'], [0.5, '#464d5d'], [1, '#30353f']];
   const jeanB = [[0, '#454b59'], [0.5, '#343947'], [1, '#23262e']];
   const outline = 'rgba(20,28,10,.5)';
+  const defLine = 'rgba(46,68,22,.5)'; /* 근육 정의선 */
   const outW = 2.2 * Math.min(s, 1.4);
 
   ctx.save();
@@ -4063,7 +4084,7 @@ function drawHulk(){
   ctx.fillStyle = 'rgba(22,22,31,.28)';
   const airH = GROUND - H.y;
   ctx.beginPath();
-  ctx.ellipse(0, GROUND - H.y, bodyW * 0.66 * Math.max(0.35, 1 - airH / 900), 8 * s, 0, 0, 7);
+  ctx.ellipse(0, GROUND - H.y, bodyW * 0.62 * Math.max(0.35, 1 - airH / 900), 8 * s, 0, 0, 7);
   ctx.fill();
   ctx.restore();
 
@@ -4072,26 +4093,28 @@ function drawHulk(){
   ctx.lineWidth = outW;
 
   const rising = !H.onGround && H.vy < -100;
-  const landCr = H.landT > 0 ? H.landT / 0.26 : 0; /* 착지 크라우치 */
+  const landCr = H.landT > 0 ? H.landT / 0.26 : 0;
 
-  /* 고릴라 체형: 다리 짧고 팔이 무릎까지 */
+  /* 초근육질 체형: 넓은 어깨, 굵은 전완, 짧고 굵은 다리 */
   const legH = bodyH * 0.42;
-  const torsoH = bodyH * 0.47;
-  const headR = bodyH * 0.095;
-  const hipY = -legH - bob * 0.4 + landCr * 15 * s; /* 착지 시 몸 낮춤 */
+  const torsoH = bodyH * 0.48;
+  const headR = bodyH * 0.092;
+  const hipY = -legH - bob * 0.4 + landCr * 15 * s;
   const thighL = legH * 0.52, shinL = legH * 0.52;
+  const armLenU = bodyH * 0.30, armLenF = bodyH * 0.31; /* 긴 팔 (너클워커 체형) */
 
   let lean = 0;
   if (dashing) lean = 0.3;
   else if (H.slam === 1) lean = -0.16;
   else if (H.slam === 2) lean = 0.2;
-  else if (rising) lean = -0.14;              /* 도약: 가슴 펴기 */
-  else if (!H.onGround) lean = 0.18;          /* 하강: 착지 준비 */
-  else if (clapping) lean = 0.08;
-  else if (H.roarT > 0) lean = -0.18; /* 포효: 상체 젖히기 */
+  else if (rising) lean = -0.14;
+  else if (!H.onGround) lean = 0.18;
+  else if (clapping) lean = clapPh < 0.4 ? -0.1 : 0.14; /* 벌릴 땐 젖히고 칠 땐 싣기 */
+  else if (H.roarT > 0) lean = -0.18;
   else if (moving && H.onGround) lean = 0.14;
   lean += landCr * 0.24;
-  if (punchPh > 0) lean += punchPh * (pSeq === 2 ? 0.2 : 0.12); /* 펀치 체중 싣기 */
+  if (punchPh > 0 && !hammering) lean += punchPh * 0.12;
+  if (hammering) lean += (punchRaw < 0.35 ? -punchRaw * 0.5 : (punchRaw - 0.35) * 0.55);
   function rotated(fn){
     ctx.save();
     ctx.translate(0, hipY);
@@ -4101,28 +4124,31 @@ function drawHulk(){
     ctx.restore();
   }
 
+  const shYBase = hipY - torsoH * 0.76;
+  function shoulderX(front){ return front ? bodyW * 0.40 : -bodyW * 0.38; }
+
   /* ---- 다리 ---- */
   function leg(px, phase, front){
     let thA, knee;
     if (!H.onGround) {
       if (H.slam === 2) { thA = front ? 0.35 : -0.3; knee = 1.0; }
-      else if (rising) { thA = front ? 0.35 : -0.75; knee = front ? 0.55 : 0.25; } /* 도약: 다리 뒤로 참 */
-      else { thA = front ? 0.6 : -0.35; knee = front ? 0.9 : 0.5; }               /* 하강: 착지 준비 */
+      else if (rising) { thA = front ? 0.35 : -0.75; knee = front ? 0.55 : 0.25; }
+      else { thA = front ? 0.6 : -0.35; knee = front ? 0.9 : 0.5; }
     } else if (landCr > 0.2) {
-      thA = front ? 0.3 : -0.28; knee = 0.55 * landCr + 0.15; /* 착지 웅크림 */
+      thA = front ? 0.3 : -0.28; knee = 0.55 * landCr + 0.15;
     } else if (moving) {
       const amp = dashing ? 0.85 : 0.55;
       thA = amp * Math.sin(t2 + phase);
       knee = 0.18 + (dashing ? 1.0 : 0.55) * Math.max(0, Math.sin(t2 + phase + 1.15));
     } else {
-      thA = front ? 0.14 : -0.14; knee = 0.2; /* 살짝 굽힌 와이드 스탠스 */
+      thA = front ? 0.14 : -0.14; knee = 0.2;
     }
     const hx = px, hy = hipY;
     const kx = hx + Math.sin(thA) * thighL, ky = hy + Math.cos(thA) * thighL;
     const sA = thA - knee;
     const ax = kx + Math.sin(sA) * shinL, ay = ky + Math.cos(sA) * shinL;
-    const thR = bodyW * 0.19, knR = bodyW * 0.125, caR = bodyW * 0.155, anR = bodyW * 0.09;
-    /* 종아리 (맨살) */
+    const thR = bodyW * 0.215, knR = bodyW * 0.135, caR = bodyW * 0.175, anR = bodyW * 0.1;
+    /* 종아리 */
     limbG(kx, ky, ax, ay, caR, anR, front ? skinF : skinB);
     /* 발 */
     const g = ctx.createLinearGradient(ax, ay - anR, ax, ay + anR);
@@ -4150,54 +4176,87 @@ function drawHulk(){
     ctx.lineTo(fx(knR * 1.2, 0), fy(knR * 1.2, 0));
     ctx.closePath();
     ctx.fill();
+    /* 종아리 근육선 */
+    if (front) {
+      ctx.save();
+      ctx.strokeStyle = defLine;
+      ctx.lineWidth = outW * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(kx + caR * 0.3, ky + shinL * 0.15);
+      ctx.quadraticCurveTo(kx + caR * 0.55, ky + shinL * 0.4, ax + anR * 0.3, ay - shinL * 0.15);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
-  /* ---- 팔 포즈 ---- */
+  /* ---- 회전식 팔 포즈 (잽/훅/기타 상태) ---- */
   function armPose(front){
-    if (punchPh > 0) {
-      /* 3연타: 잽(앞팔) → 훅(뒤팔) → 양손 해머 내려찍기 */
-      if (pSeq === 2) return [2.75 - punchPh * 1.85, -0.12, 1 + punchPh * 0.05];
+    if (punchPh > 0 && !hammering) {
       if (pSeq === 1) return front ? [0.95, 1.3, 1] : [1.5, 0.07, 1 + punchPh * 0.35];
       return front ? [1.5, 0.07, 1 + punchPh * 0.3] : [-0.75, 0.5, 1];
     }
-    if (H.roarT > 0) return front ? [1.05, 1.15, 1] : [-0.95, 0.9, 1]; /* 포효: 팔 벌리기 */
-    if (clapping) return front ? [1.6 - clapPh * 0.25, 0.12, 1] : [-1.5 + clapPh * 2.9, 0.12, 1];
+    if (H.roarT > 0) return front ? [1.05, 1.15, 1] : [-0.95, 0.9, 1];
     if (H.slam === 1) return [2.65, -0.2, 1];
     if (H.slam === 2) return [1.05, -0.1, 1];
     if (dashing) return front ? [0.3 + Math.sin(t2) * 0.8, 1.25, 1] : [0.3 - Math.sin(t2) * 0.8, 1.25, 1];
     if (!H.onGround) {
-      if (rising) return front ? [-0.55, 0.45, 1] : [-0.95, 0.35, 1]; /* 도약: 팔 뒤로 젖힘 */
-      return front ? [1.15, 0.5, 1] : [0.55, 0.65, 1];                 /* 하강: 팔 앞으로 */
+      if (rising) return front ? [-0.55, 0.45, 1] : [-0.95, 0.35, 1];
+      return front ? [1.15, 0.5, 1] : [0.55, 0.65, 1];
     }
-    if (landCr > 0.2) return front ? [0.7, 0.85, 1] : [-0.45, 0.5, 1]; /* 착지: 손 바닥 짚기 */
+    if (landCr > 0.2) return front ? [0.7, 0.85, 1] : [-0.45, 0.5, 1];
     if (raging && !moving) return front ? [0.8, 1.7, 1] : [-0.7, 1.6, 1];
     if (moving) return front ? [0.3 - swing * 0.55, 0.45, 1] : [-0.35 + swing * 0.55, 0.42, 1];
     return front ? [0.3, 0.36, 1] : [-0.38, 0.32, 1];
   }
-  function arm(front){
-    const [angU, bend, lm] = armPose(front);
-    const shX = front ? bodyW * 0.38 : -bodyW * 0.36;
-    const shY = hipY - torsoH * 0.76;
-    const upL = bodyH * 0.25 * lm, foL = bodyH * 0.26 * lm;
-    const dR = bodyW * (front ? 0.17 : 0.15);
-    const uR = bodyW * (front ? 0.14 : 0.125);
-    const fR = bodyW * (front ? 0.165 : 0.15);
-    const wR = bodyW * (front ? 0.115 : 0.105);
-    const sk = front ? skinF : skinB;
-    const ex = shX + Math.sin(angU) * upL, ey = shY + Math.cos(angU) * upL;
-    const aF = angU + bend;
-    const wx = ex + Math.sin(aF) * foL, wy = ey + Math.cos(aF) * foL;
-    limbG(shX, shY, ex, ey, uR * 1.2, uR, sk);
-    limbG(ex, ey, wx, wy, fR, wR, sk);
-    /* 삼각근 */
+  function deltoid(front, shX, shY){
+    const dR = bodyW * (front ? 0.2 : 0.18);
     const dg = ctx.createRadialGradient(shX + dR * 0.25, shY - dR * 0.35, dR * 0.1, shX, shY, dR);
     dg.addColorStop(0, front ? P.hi : P.base);
     dg.addColorStop(0.65, front ? P.base : P.mid);
     dg.addColorStop(1, front ? P.dark : P.deep);
     ctx.fillStyle = dg;
     ctx.beginPath(); ctx.arc(shX, shY, dR, 0, 7); ctx.fill(); ctx.stroke();
-    /* 주먹 (큼직하게 + 손가락 마디) */
-    const fiR = bodyW * (front ? 0.175 : 0.155);
+    /* 삼각근 분리선 */
+    if (front) {
+      ctx.save();
+      ctx.strokeStyle = defLine;
+      ctx.lineWidth = outW * 0.5;
+      ctx.beginPath();
+      ctx.arc(shX, shY, dR * 0.92, 0.5, 1.7);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  function arm(front){
+    const [angU, bend, lm] = armPose(front);
+    const shX = shoulderX(front);
+    const shY = shYBase;
+    const upL = armLenU * lm, foL = armLenF * lm;
+    const uR = bodyW * (front ? 0.165 : 0.15);
+    const fR = bodyW * (front ? 0.19 : 0.17);
+    const wR = bodyW * (front ? 0.13 : 0.115);
+    const sk = front ? skinF : skinB;
+    const ex = shX + Math.sin(angU) * upL, ey = shY + Math.cos(angU) * upL;
+    const aF = angU + bend;
+    const wx = ex + Math.sin(aF) * foL, wy = ey + Math.cos(aF) * foL;
+    limbG(shX, shY, ex, ey, uR * 1.2, uR, sk);
+    limbG(ex, ey, wx, wy, fR, wR, sk);
+    deltoid(front, shX, shY);
+    /* 이두박근 라인 */
+    if (front) {
+      ctx.save();
+      ctx.strokeStyle = defLine;
+      ctx.lineWidth = outW * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(lerp2(shX, ex, 0.25) + Math.cos(angU) * uR * 0.5, lerp2(shY, ey, 0.25) - Math.sin(angU) * uR * 0.5);
+      ctx.quadraticCurveTo(
+        lerp2(shX, ex, 0.55) + Math.cos(angU) * uR * 0.75, lerp2(shY, ey, 0.55) - Math.sin(angU) * uR * 0.75,
+        lerp2(shX, ex, 0.85) + Math.cos(angU) * uR * 0.4, lerp2(shY, ey, 0.85) - Math.sin(angU) * uR * 0.4);
+      ctx.stroke();
+      ctx.restore();
+    }
+    /* 주먹 */
+    const fiR = bodyW * (front ? 0.21 : 0.19);
     const fcx = wx + Math.sin(aF) * fiR * 0.5, fcy = wy + Math.cos(aF) * fiR * 0.5;
     const fg = ctx.createRadialGradient(fcx + fiR * 0.3, fcy - fiR * 0.35, fiR * 0.15, fcx, fcy, fiR);
     fg.addColorStop(0, front ? P.base : P.mid);
@@ -4216,12 +4275,12 @@ function drawHulk(){
       }
       ctx.restore();
     }
-    /* 휘두르는 팔 잔상 (발광 스트릭) */
-    const puncher = punchPh > 0 && (pSeq === 2 || (pSeq === 0 && front) || (pSeq === 1 && !front));
+    /* 휘두르는 팔 잔상 */
+    const puncher = punchPh > 0 && !hammering && ((pSeq === 0 && front) || (pSeq === 1 && !front));
     if (puncher && punchPh > 0.2) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = 'rgba(205,235,130,.3)';
+      ctx.fillStyle = raging ? 'rgba(255,150,110,.3)' : 'rgba(205,235,130,.3)';
       for (const f of [0.5, 0.72]) {
         ctx.beginPath();
         ctx.arc(shX + (fcx - shX) * f, shY + (fcy - shY) * f, fiR * (0.65 + f * 0.35), 0, 7);
@@ -4229,7 +4288,6 @@ function drawHulk(){
       }
       ctx.restore();
     }
-    /* 펀치 스피드라인 */
     if (puncher && punchPh > 0.45) {
       ctx.save();
       ctx.globalAlpha = (punchPh - 0.45) * 1.4;
@@ -4245,13 +4303,124 @@ function drawHulk(){
     }
   }
 
-  /* ---- 몸통 (등 굽은 거구, 승모근 사면) ---- */
+  /* ---- IK 팔: 손을 목표점으로 (합장 박수·해머용) ---- */
+  function armTo(front, hxT, hyT, elbowSign, palm){
+    const shX = shoulderX(front), shY = shYBase;
+    const uR = bodyW * (front ? 0.165 : 0.15);
+    const fR = bodyW * (front ? 0.19 : 0.17);
+    const wR = bodyW * (front ? 0.13 : 0.115);
+    let dx = hxT - shX, dy = hyT - shY;
+    let dist = Math.hypot(dx, dy) || 1;
+    const maxD = armLenU + armLenF - 6;
+    if (dist > maxD) { dx *= maxD / dist; dy *= maxD / dist; dist = maxD; }
+    if (dist < 16) { /* 어깨에 너무 붙으면 방향 고정 (팔꿈치 떨림 방지) */
+      const nn = Math.hypot(1, 0.35);
+      dx = 16 / nn; dy = 16 * 0.35 / nn; dist = 16;
+    }
+    const hx3 = shX + dx, hy3 = shY + dy;
+    const nx = dx / dist, ny = dy / dist;
+    const bendAmt = Math.sqrt(Math.max(20, (armLenU + armLenF) * (armLenU + armLenF) - dist * dist)) * 0.28;
+    const ex = (shX + hx3) / 2 - ny * bendAmt * elbowSign;
+    const ey = (shY + hy3) / 2 + nx * bendAmt * elbowSign;
+    const sk = front ? skinF : skinB;
+    limbG(shX, shY, ex, ey, uR * 1.2, uR, sk);
+    limbG(ex, ey, hx3, hy3, fR, wR, sk);
+    deltoid(front, shX, shY);
+    /* 손: 합장은 손바닥, 해머는 주먹 */
+    const fiR = bodyW * (front ? 0.21 : 0.19);
+    const ha = Math.atan2(hy3 - ey, hx3 - ex);
+    ctx.save();
+    ctx.translate(hx3, hy3);
+    ctx.rotate(ha);
+    const fg = ctx.createRadialGradient(0, -fiR * 0.3, fiR * 0.15, 0, 0, fiR);
+    fg.addColorStop(0, front ? P.base : P.mid);
+    fg.addColorStop(1, front ? P.dark : P.deep);
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    if (palm) ctx.roundRect(-fiR * 0.4, -fiR * 0.95, fiR * 1.5, fiR * 1.9, fiR * 0.45);
+    else ctx.arc(fiR * 0.4, 0, fiR, 0, 7);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+    return [hx3, hy3];
+  }
+
+  /* ---- 양손 합동 모션 ---- */
+  function drawBothHands(){
+    let fT, bT; /* [x, y] 목표 */
+    let palm = false;
+    let hit = false;
+    if (clapping) {
+      palm = true;
+      const meet = [bodyW * 0.40, shYBase + bodyH * 0.18];      /* 가슴 앞 합장점 (양팔 도달 가능) */
+      const fOpen = [bodyW * 0.55, shYBase - armLenU * 1.3];    /* 앞팔: 위로 크게 */
+      const bOpen = [-bodyW * 0.92, shYBase + armLenU * 0.7];   /* 뒷팔: 뒤-아래로 크게 */
+      const idleF = [bodyW * 0.55, shYBase + armLenU * 1.3];
+      const idleB = [-bodyW * 0.5, shYBase + armLenU * 1.3];
+      if (clapPh < 0.4) {
+        const e = easeOut3(clapPh / 0.4);
+        fT = [lerp2(idleF[0], fOpen[0], e), lerp2(idleF[1], fOpen[1], e)];
+        bT = [lerp2(idleB[0], bOpen[0], e), lerp2(idleB[1], bOpen[1], e)];
+      } else if (clapPh < 0.62) {
+        const e = easeIn3((clapPh - 0.4) / 0.22);
+        fT = [lerp2(fOpen[0], meet[0] + bodyW * 0.04, e), lerp2(fOpen[1], meet[1], e)];
+        bT = [lerp2(bOpen[0], meet[0] - bodyW * 0.06, e), lerp2(bOpen[1], meet[1], e)];
+      } else {
+        hit = true;
+        const tremor = Math.sin(G.time * 60) * 2;
+        fT = [meet[0] + bodyW * 0.04 + tremor, meet[1]];
+        bT = [meet[0] - bodyW * 0.06 - tremor, meet[1]];
+      }
+    } else {
+      /* 해머: 두 주먹 맞잡고 머리 위 → 전방 아래로 내려찍기 */
+      const up = [bodyW * 0.02, shYBase - bodyH * 0.5];
+      const down = [bodyW * 0.42, hipY - torsoH * 0.15];
+      const idle = [bodyW * 0.4, shYBase + armLenU * 1.1];
+      let M;
+      if (punchRaw < 0.33) {
+        const e = easeOut3(punchRaw / 0.33);
+        M = [lerp2(idle[0], up[0], e), lerp2(idle[1], up[1], e)];
+      } else if (punchRaw < 0.6) {
+        const e = easeIn3((punchRaw - 0.33) / 0.27);
+        M = [lerp2(up[0], down[0], e), lerp2(up[1], down[1], e)];
+        /* 내려찍기 잔상 */
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = raging ? 'rgba(255,150,110,.28)' : 'rgba(205,235,130,.28)';
+        for (const f of [0.4, 0.7]) {
+          ctx.beginPath();
+          ctx.arc(lerp2(up[0], M[0], f), lerp2(up[1], M[1], f), bodyW * 0.24, 0, 7);
+          ctx.fill();
+        }
+        ctx.restore();
+      } else {
+        M = down;
+        hit = true;
+      }
+      fT = [M[0] + bodyW * 0.06, M[1]];
+      bT = [M[0] - bodyW * 0.08, M[1] + 4];
+    }
+    armTo(false, bT[0], bT[1], 1, palm);
+    const handPos = armTo(true, fT[0], fT[1], clapping ? -1 : 1, palm);
+    /* 임팩트 섬광 */
+    if (hit) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const fl = ctx.createRadialGradient(handPos[0], handPos[1], 4, handPos[0], handPos[1], bodyW * 0.7);
+      fl.addColorStop(0, clapping ? 'rgba(220,245,255,.95)' : 'rgba(255,230,160,.9)');
+      fl.addColorStop(1, 'rgba(150,210,255,0)');
+      ctx.fillStyle = fl;
+      ctx.fillRect(handPos[0] - bodyW, handPos[1] - bodyW, bodyW * 2, bodyW * 2);
+      ctx.restore();
+    }
+  }
+
+  /* ---- 몸통 (더 넓은 어깨 + 두꺼운 흉근 + 식스팩) ---- */
   function torso(){
-    const hw = bodyW * 0.32, ww = bodyW * 0.36;
-    const lw = bodyW * 0.55, sw = bodyW * 0.5;
+    const hw = bodyW * 0.34, ww = bodyW * 0.38;
+    const lw = bodyW * 0.62, sw = bodyW * 0.56;
     const yHip = hipY, yWaist = hipY - torsoH * 0.24;
     const yLat = hipY - torsoH * 0.6, ySh = hipY - torsoH * 0.92;
-    const yTrap = ySh - torsoH * 0.2;
+    const yTrap = ySh - torsoH * 0.24;
     const tg = ctx.createLinearGradient(-lw, 0, lw * 0.9, 0);
     tg.addColorStop(0, P.deep);
     tg.addColorStop(0.3, P.mid);
@@ -4262,45 +4431,52 @@ function drawHulk(){
     ctx.moveTo(-hw, yHip + 6 * s);
     ctx.quadraticCurveTo(-ww * 1.08, yWaist, -lw, yLat);
     ctx.quadraticCurveTo(-lw * 1.08, ySh + torsoH * 0.1, -sw * 0.92, ySh);
-    /* 등→승모근→목 사면 */
-    ctx.quadraticCurveTo(-bodyW * 0.12, yTrap - torsoH * 0.04, bodyW * 0.16, yTrap + torsoH * 0.03);
-    /* 목→앞어깨 */
-    ctx.quadraticCurveTo(bodyW * 0.42, yTrap + torsoH * 0.05, sw, ySh + torsoH * 0.04);
-    /* 가슴 전면 */
+    ctx.quadraticCurveTo(-bodyW * 0.12, yTrap - torsoH * 0.05, bodyW * 0.16, yTrap + torsoH * 0.03);
+    ctx.quadraticCurveTo(bodyW * 0.44, yTrap + torsoH * 0.05, sw, ySh + torsoH * 0.04);
     ctx.quadraticCurveTo(lw * 1.06, ySh + torsoH * 0.3, ww * 1.02, yWaist);
     ctx.quadraticCurveTo(hw * 1.04, yHip - 4 * s, hw, yHip + 6 * s);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
-    /* 대흉근 하이라이트 */
+    /* 대흉근 하이라이트 (더 크게) */
     ctx.save();
-    const pg = ctx.createRadialGradient(bodyW * 0.2, ySh + torsoH * 0.22, bodyW * 0.04,
-                                        bodyW * 0.2, ySh + torsoH * 0.24, bodyW * 0.34);
-    pg.addColorStop(0, 'rgba(190,215,130,.5)');
+    const pg = ctx.createRadialGradient(bodyW * 0.2, ySh + torsoH * 0.2, bodyW * 0.05,
+                                        bodyW * 0.2, ySh + torsoH * 0.23, bodyW * 0.4);
+    pg.addColorStop(0, 'rgba(190,215,130,.55)');
     pg.addColorStop(1, 'rgba(190,215,130,0)');
     ctx.fillStyle = pg;
     ctx.beginPath();
-    ctx.ellipse(bodyW * 0.18, ySh + torsoH * 0.24, bodyW * 0.3, torsoH * 0.17, -0.12, 0, 7);
+    ctx.ellipse(bodyW * 0.18, ySh + torsoH * 0.23, bodyW * 0.36, torsoH * 0.19, -0.1, 0, 7);
     ctx.fill();
     ctx.restore();
-    /* 근육 정의선 */
+    /* 근육 정의선: 흉근·흉골·식스팩·광배·상흉근 */
     ctx.save();
-    ctx.strokeStyle = 'rgba(46,68,22,.55)';
+    ctx.strokeStyle = defLine;
     ctx.lineWidth = outW * 0.55;
     ctx.beginPath();
-    /* 가슴 밑선 */
-    ctx.moveTo(-bodyW * 0.08, ySh + torsoH * 0.4);
-    ctx.quadraticCurveTo(bodyW * 0.18, ySh + torsoH * 0.48, bodyW * 0.44, ySh + torsoH * 0.32);
-    /* 흉골-복근 세로선 */
-    ctx.moveTo(bodyW * 0.09, ySh + torsoH * 0.5);
-    ctx.quadraticCurveTo(bodyW * 0.06, ySh + torsoH * 0.75, bodyW * 0.07, yHip - torsoH * 0.05);
-    /* 복근 가로선 */
-    ctx.moveTo(-bodyW * 0.08, ySh + torsoH * 0.62);
-    ctx.lineTo(bodyW * 0.24, ySh + torsoH * 0.6);
-    ctx.moveTo(-bodyW * 0.06, ySh + torsoH * 0.78);
-    ctx.lineTo(bodyW * 0.22, ySh + torsoH * 0.76);
+    /* 가슴 밑선 (양쪽 흉근) */
+    ctx.moveTo(-bodyW * 0.1, ySh + torsoH * 0.4);
+    ctx.quadraticCurveTo(bodyW * 0.06, ySh + torsoH * 0.47, bodyW * 0.16, ySh + torsoH * 0.42);
+    ctx.moveTo(bodyW * 0.18, ySh + torsoH * 0.42);
+    ctx.quadraticCurveTo(bodyW * 0.34, ySh + torsoH * 0.46, bodyW * 0.48, ySh + torsoH * 0.32);
+    /* 상흉근 갈라짐 */
+    ctx.moveTo(bodyW * 0.02, ySh + torsoH * 0.1);
+    ctx.quadraticCurveTo(bodyW * 0.2, ySh + torsoH * 0.06, bodyW * 0.38, ySh + torsoH * 0.14);
+    /* 흉골 세로선 */
+    ctx.moveTo(bodyW * 0.1, ySh + torsoH * 0.12);
+    ctx.quadraticCurveTo(bodyW * 0.07, ySh + torsoH * 0.55, bodyW * 0.08, yHip - torsoH * 0.04);
+    /* 식스팩 */
+    ctx.moveTo(-bodyW * 0.09, ySh + torsoH * 0.58);
+    ctx.lineTo(bodyW * 0.24, ySh + torsoH * 0.56);
+    ctx.moveTo(-bodyW * 0.07, ySh + torsoH * 0.72);
+    ctx.lineTo(bodyW * 0.22, ySh + torsoH * 0.7);
+    ctx.moveTo(-bodyW * 0.05, ySh + torsoH * 0.86);
+    ctx.lineTo(bodyW * 0.19, ySh + torsoH * 0.84);
     /* 광배선 */
-    ctx.moveTo(-lw * 0.82, yLat);
-    ctx.quadraticCurveTo(-bodyW * 0.3, yLat + torsoH * 0.14, -bodyW * 0.14, yWaist);
+    ctx.moveTo(-lw * 0.84, yLat);
+    ctx.quadraticCurveTo(-bodyW * 0.32, yLat + torsoH * 0.15, -bodyW * 0.16, yWaist);
+    /* 옆구리 사선 (외복사근) */
+    ctx.moveTo(bodyW * 0.3, ySh + torsoH * 0.62);
+    ctx.lineTo(bodyW * 0.24, ySh + torsoH * 0.86);
     ctx.stroke();
     ctx.restore();
     /* 승모근 림라이트 */
@@ -4309,7 +4485,7 @@ function drawHulk(){
     ctx.lineWidth = outW * 0.6;
     ctx.beginPath();
     ctx.moveTo(-sw * 0.8, ySh - torsoH * 0.015);
-    ctx.quadraticCurveTo(-bodyW * 0.1, yTrap - torsoH * 0.025, bodyW * 0.15, yTrap + torsoH * 0.04);
+    ctx.quadraticCurveTo(-bodyW * 0.1, yTrap - torsoH * 0.03, bodyW * 0.15, yTrap + torsoH * 0.04);
     ctx.stroke();
     ctx.restore();
     /* 청바지 허리춤 */
@@ -4333,10 +4509,10 @@ function drawHulk(){
   /* ---- 머리 ---- */
   function head(){
     const attacking = punchPh > 0 || H.slam || dashing || clapping || raging || H.roarT > 0;
-    const hx = bodyW * 0.19, hy = hipY - torsoH * 1.06 - headR * 0.72;
-    /* 목 */
-    limbG(hx - headR * 0.05, hy + headR * 0.55, hx - headR * 0.15, hy + headR * 1.5,
-          headR * 0.62, headR * 0.75, skinB);
+    const hx = bodyW * 0.19, hy = hipY - torsoH * 1.08 - headR * 0.7;
+    /* 굵은 목 */
+    limbG(hx - headR * 0.05, hy + headR * 0.55, hx - headR * 0.15, hy + headR * 1.6,
+          headR * 0.72, headR * 0.9, skinB);
     /* 두상 + 각진 턱 */
     const hg = ctx.createLinearGradient(hx - headR, hy - headR, hx + headR * 0.7, hy + headR);
     hg.addColorStop(0, P.mid);
@@ -4355,20 +4531,19 @@ function drawHulk(){
     ctx.beginPath();
     ctx.arc(hx - headR * 0.52, hy + headR * 0.18, headR * 0.19, 0, 7);
     ctx.fill();
-    /* 머리카락: 짙은 곱슬 덩어리 + 앞머리 */
+    /* 머리카락 */
     ctx.fillStyle = '#221d19';
     ctx.beginPath();
     ctx.moveTo(hx + headR * 0.8, hy - headR * 0.48);
     ctx.lineTo(hx + headR * 0.5, hy - headR * 0.26);
-    ctx.lineTo(hx + headR * 0.4, hy - headR * 0.6);
-    ctx.lineTo(hx + headR * 0.1, hy - headR * 0.38);
-    ctx.quadraticCurveTo(hx - headR * 0.42, hy - headR * 0.56, hx - headR * 0.62, hy - headR * 0.22);
+    ctx.lineTo(hx + headR * 0.42, hy - headR * 0.6);
+    ctx.lineTo(hx + headR * 0.12, hy - headR * 0.4);
+    ctx.quadraticCurveTo(hx - headR * 0.42, hy - headR * 0.58, hx - headR * 0.62, hy - headR * 0.24);
     ctx.lineTo(hx - headR * 0.88, hy + headR * 0.3);
-    ctx.quadraticCurveTo(hx - headR * 1.02, hy - headR * 0.6, hx - headR * 0.36, hy - headR * 1.0);
-    ctx.quadraticCurveTo(hx + headR * 0.34, hy - headR * 1.24, hx + headR * 0.8, hy - headR * 0.48);
+    ctx.quadraticCurveTo(hx - headR * 1.02, hy - headR * 0.62, hx - headR * 0.36, hy - headR * 1.0);
+    ctx.quadraticCurveTo(hx + headR * 0.34, hy - headR * 1.22, hx + headR * 0.8, hy - headR * 0.48);
     ctx.closePath();
     ctx.fill();
-    /* 머리 윤기 */
     ctx.save();
     ctx.strokeStyle = 'rgba(120,105,90,.35)';
     ctx.lineWidth = outW * 0.5;
@@ -4448,11 +4623,14 @@ function drawHulk(){
   }
 
   /* ---- 순서: 뒤팔 → 뒷다리 → 몸통·머리 → 앞다리 → 앞팔 ---- */
-  rotated(() => arm(false));
+  rotated(() => { if (!useHands) arm(false); });
   leg(-bodyW * 0.17, Math.PI, false);
   rotated(() => { torso(); head(); });
   leg(bodyW * 0.17, 0, true);
-  rotated(() => arm(true));
+  rotated(() => {
+    if (useHands) drawBothHands();
+    else arm(true);
+  });
 
   /* 돌진 모션 스트릭 */
   if (dashing) {
@@ -4468,13 +4646,6 @@ function drawHulk(){
       ctx.stroke();
     }
     ctx.restore();
-  }
-  /* 천둥박수 임팩트 */
-  if (clapping && clapPh > 0.42 && clapPh < 0.78) {
-    ctx.fillStyle = '#ffd23f';
-    ctx.beginPath();
-    ctx.arc(bodyW * 0.88, hipY - torsoH * 0.78, bodyW * 0.3, 0, 7);
-    ctx.fill();
   }
 
   ctx.restore();
