@@ -5102,12 +5102,25 @@ function drawHulk(){
     hg.addColorStop(1, P.dark);
     ctx.fillStyle = hg;
     ctx.beginPath();
-    ctx.arc(hx, hy, headR, Math.PI * 0.85, Math.PI * 2.0);
-    ctx.lineTo(hx + headR * 1.0, hy + headR * 0.42);
-    ctx.quadraticCurveTo(hx + headR * 0.96, hy + headR * 1.02, hx + headR * 0.34, hy + headR * 1.06);
-    ctx.quadraticCurveTo(hx - headR * 0.45, hy + headR * 1.06, hx - headR * 0.75, hy + headR * 0.5);
+    ctx.arc(hx, hy, headR, Math.PI * 0.85, Math.PI * 1.98);
+    /* 광대 → 각진 넓은 턱 */
+    ctx.lineTo(hx + headR * 1.02, hy + headR * 0.34);
+    ctx.lineTo(hx + headR * 0.94, hy + headR * 0.78);
+    ctx.lineTo(hx + headR * 0.6, hy + headR * 1.1);
+    ctx.lineTo(hx + headR * 0.14, hy + headR * 1.14);
+    ctx.quadraticCurveTo(hx - headR * 0.42, hy + headR * 1.06, hx - headR * 0.72, hy + headR * 0.5);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
+    /* 턱밑 음영 */
+    ctx.save();
+    ctx.fillStyle = 'rgba(29,86,25,.3)';
+    ctx.beginPath();
+    ctx.moveTo(hx + headR * 0.55, hy + headR * 1.06);
+    ctx.quadraticCurveTo(hx + headR * 0.1, hy + headR * 1.1, hx - headR * 0.35, hy + headR * 0.95);
+    ctx.quadraticCurveTo(hx + headR * 0.1, hy + headR * 0.92, hx + headR * 0.55, hy + headR * 1.06);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
     /* 귀 */
     ctx.fillStyle = P.mid;
     ctx.beginPath();
@@ -5133,42 +5146,76 @@ function drawHulk(){
     ctx.lineTo(hx + headR * 0.56, hy - headR * 1.05);
     ctx.stroke();
     ctx.restore();
-    /* 눈두덩 그림자 */
+    /* 눈두덩 그림자 (깊게) */
     const browDrop = attacking ? headR * 0.1 : 0;
     ctx.save();
-    ctx.fillStyle = 'rgba(30,44,14,.4)';
+    ctx.fillStyle = 'rgba(30,44,14,.42)';
     ctx.beginPath();
-    ctx.ellipse(hx + headR * 0.52, hy - headR * 0.05 + browDrop, headR * 0.36, headR * 0.2, 0.1, 0, 7);
+    ctx.ellipse(hx + headR * 0.52, hy - headR * 0.04 + browDrop, headR * 0.38, headR * 0.2, 0.1, 0, 7);
     ctx.fill();
     ctx.restore();
-    /* 눈썹 */
+    /* 두꺼운 일자 눈썹 바 */
     ctx.save();
-    ctx.strokeStyle = '#1c260c';
-    ctx.lineWidth = outW * 0.9;
-    ctx.lineCap = 'round';
+    ctx.fillStyle = '#15200a';
+    ctx.translate(hx + headR * 0.5, hy - headR * 0.2 + browDrop);
+    ctx.rotate(0.15);
     ctx.beginPath();
-    ctx.moveTo(hx + headR * 0.2, hy - headR * 0.3 + browDrop);
-    ctx.lineTo(hx + headR * 0.86, hy - headR * 0.1 + browDrop);
+    ctx.roundRect(-headR * 0.36, -headR * 0.1, headR * 0.82, headR * 0.19, headR * 0.05);
+    ctx.fill();
+    ctx.restore();
+    /* 미간 주름 */
+    ctx.save();
+    ctx.strokeStyle = 'rgba(30,44,14,.6)';
+    ctx.lineWidth = outW * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(hx + headR * 0.12, hy - headR * 0.28 + browDrop);
+    ctx.lineTo(hx + headR * 0.07, hy - headR * 0.02 + browDrop);
     ctx.stroke();
     ctx.restore();
-    /* 눈 */
-    ctx.fillStyle = raging ? '#ffe089' : '#e9f2d4';
+    /* 눈: 윗눈꺼풀 아래 밝은 연두 눈 */
+    ctx.fillStyle = raging ? '#ffe089' : '#d9f26a';
     ctx.beginPath();
-    ctx.arc(hx + headR * 0.58, hy + headR * 0.04 + browDrop * 0.5, headR * 0.12, 0, 7);
+    ctx.ellipse(hx + headR * 0.58, hy + headR * 0.06 + browDrop * 0.5, headR * 0.15, headR * 0.1, 0.05, 0, 7);
     ctx.fill();
     if (!raging) {
       ctx.fillStyle = '#141d08';
       ctx.beginPath();
-      ctx.arc(hx + headR * 0.62, hy + headR * 0.04 + browDrop * 0.5, headR * 0.055, 0, 7);
+      ctx.arc(hx + headR * 0.63, hy + headR * 0.06 + browDrop * 0.5, headR * 0.05, 0, 7);
       ctx.fill();
     }
-    /* 코 */
+    ctx.save();
+    ctx.strokeStyle = 'rgba(21,32,10,.85)';
+    ctx.lineWidth = outW * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(hx + headR * 0.42, hy - headR * 0.02 + browDrop);
+    ctx.lineTo(hx + headR * 0.74, hy + headR * 0.02 + browDrop);
+    ctx.stroke();
+    ctx.restore();
+    /* 광대 정의선 */
+    ctx.save();
+    ctx.strokeStyle = 'rgba(46,68,22,.45)';
+    ctx.lineWidth = outW * 0.45;
+    ctx.beginPath();
+    ctx.moveTo(hx + headR * 0.88, hy + headR * 0.28);
+    ctx.quadraticCurveTo(hx + headR * 0.72, hy + headR * 0.42, hx + headR * 0.56, hy + headR * 0.46);
+    ctx.stroke();
+    ctx.restore();
+    /* 코: 콧대 + 콧방울 */
     ctx.save();
     ctx.strokeStyle = 'rgba(46,68,22,.7)';
     ctx.lineWidth = outW * 0.5;
     ctx.beginPath();
-    ctx.moveTo(hx + headR * 0.9, hy + headR * 0.12);
-    ctx.lineTo(hx + headR * 0.97, hy + headR * 0.33);
+    ctx.moveTo(hx + headR * 0.84, hy + headR * 0.02 + browDrop * 0.4);
+    ctx.lineTo(hx + headR * 0.94, hy + headR * 0.3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(hx + headR * 0.85, hy + headR * 0.34, headR * 0.09, 0.4, 2.6);
+    ctx.stroke();
+    /* 팔자주름 */
+    ctx.strokeStyle = 'rgba(46,68,22,.45)';
+    ctx.beginPath();
+    ctx.moveTo(hx + headR * 0.8, hy + headR * 0.42);
+    ctx.quadraticCurveTo(hx + headR * 0.92, hy + headR * 0.54, hx + headR * 0.9, hy + headR * 0.6);
     ctx.stroke();
     ctx.restore();
     /* 입: 평소엔 굳게 다묾, 공격 중엔 으르렁, 변신 직후엔 씩 웃음 */
@@ -5191,13 +5238,20 @@ function drawHulk(){
       ctx.fillRect(hx + headR * 0.33, hy + headR * 0.53, headR * 0.52, headR * 0.1);
       ctx.fillRect(hx + headR * 0.33, hy + headR * 0.76, headR * 0.52, headR * 0.08);
     } else {
+      /* 다부지게 다문 입 + 아랫입술 음영 */
       ctx.save();
-      ctx.strokeStyle = 'rgba(30,42,14,.85)';
-      ctx.lineWidth = outW * 0.7;
+      ctx.strokeStyle = 'rgba(30,42,14,.9)';
+      ctx.lineWidth = outW * 0.65;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(hx + headR * 0.28, hy + headR * 0.64);
-      ctx.quadraticCurveTo(hx + headR * 0.6, hy + headR * 0.76, hx + headR * 0.88, hy + headR * 0.58);
+      ctx.moveTo(hx + headR * 0.3, hy + headR * 0.68);
+      ctx.quadraticCurveTo(hx + headR * 0.58, hy + headR * 0.73, hx + headR * 0.86, hy + headR * 0.64);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(46,68,22,.4)';
+      ctx.lineWidth = outW * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(hx + headR * 0.42, hy + headR * 0.85);
+      ctx.quadraticCurveTo(hx + headR * 0.58, hy + headR * 0.9, hx + headR * 0.72, hy + headR * 0.84);
       ctx.stroke();
       ctx.restore();
     }
