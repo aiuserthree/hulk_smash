@@ -2552,13 +2552,18 @@ function showClear(){
   } else {
     ui.unlockCard.classList.remove('on');
   }
-  /* 보스 보상: 새 액티브 스킬 택1 (중복 선택 시 레벨업) */
+  /* 보스 보상: 미보유 스킬만 노출, 전부 모으면 레벨업 모드 */
   if (G.bossDefeated) {
     ui.upgradeHead.classList.add('on');
     ui.upgradeRow.classList.add('on');
     ui.nextBtn.style.display = 'none';
     ui.upgradeRow.innerHTML = '';
-    for (const u of ACTIVES) {
+    const notOwned = ACTIVES.filter(a => G.actives[a.key] === 0);
+    const pool = notOwned.length > 0 ? notOwned : ACTIVES;
+    ui.upgradeHead.textContent = notOwned.length > 0
+      ? '⚡ 새 스킬 획득 — 하나를 골라라!'
+      : '⚡ 모든 스킬 보유! 레벨업을 골라라!';
+    for (const u of pool) {
       const lv = G.actives[u.key];
       const card = document.createElement('div');
       card.className = 'upCard';
