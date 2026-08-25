@@ -106,14 +106,30 @@
   }
   .skill .cdt:empty{display:none}
   .skill .lv, .tbtn .lv{
-    position:absolute;top:-9px;right:-9px;
-    min-width:22px;height:22px;padding:0 3px;
+    position:absolute;top:-11px;right:-10px;
+    min-width:30px;height:21px;padding:0 6px;
     background:var(--yellow);border:2.5px solid var(--ink);border-radius:11px;
-    font-family:"Black Han Sans",sans-serif;font-size:12px;color:var(--ink);
+    box-shadow:2px 2px 0 var(--ink);
+    font-family:"Black Han Sans",sans-serif;font-size:12px;color:#8a2b00;
     display:flex;align-items:center;justify-content:center;
     pointer-events:none;
   }
   .skill .lv:empty, .tbtn .lv:empty{display:none}
+  .lv.pop{animation:lvPop .5s}
+  @keyframes lvPop{
+    0%{transform:scale(.4) rotate(-20deg)}
+    55%{transform:scale(1.5) rotate(8deg)}
+    100%{transform:scale(1) rotate(0)}
+  }
+  .upCard .cardNew{
+    margin-top:7px;font-weight:900;font-size:12px;color:#1d5c2a;
+    background:#c9e6a0;border:2px solid var(--ink);border-radius:8px;padding:3px 6px;
+  }
+  .upCard .cardLv{
+    margin-top:7px;font-family:"Black Han Sans",sans-serif;font-size:19px;color:#c22e30;
+  }
+  .upCard .cardLv em{font-style:normal;color:var(--ink);font-size:15px}
+  .upCard .cardFx{font-size:11px;font-weight:900;color:#8a6d00;margin-top:2px}
   .skill.ready-flash{animation:readyPop .3s}
   @keyframes readyPop{50%{transform:scale(1.15) rotate(-1deg)}}
   #rageFill{
@@ -2879,10 +2895,17 @@ function updateUpgradeBadges(){
     ui.skills[k].classList.toggle('hidden', lv === 0);
     ui.tskills[k].classList.toggle('hidden', lv === 0);
     const txt = lv >= 2 ? 'Lv' + lv : '';
-    const chip = ui.skills[k].querySelector('.lv');
-    if (chip && chip.textContent !== txt) chip.textContent = txt;
-    const tlv = ui.tskills[k].querySelector('.lv');
-    if (tlv && tlv.textContent !== txt) tlv.textContent = txt;
+    for (const el of [ui.skills[k].querySelector('.lv'), ui.tskills[k].querySelector('.lv')]) {
+      if (el && el.textContent !== txt) {
+        el.textContent = txt;
+        /* 레벨업 순간 통통 튀는 강조 */
+        if (txt) {
+          el.classList.remove('pop');
+          void el.offsetWidth;
+          el.classList.add('pop');
+        }
+      }
+    }
   }
 }
 function updateSkillCds(){
@@ -2968,9 +2991,10 @@ function showClear(){
       card.className = 'upCard';
       card.innerHTML = '<b>' + u.name + '</b>'
         + '<span>' + u.desc.replace('\n', '<br>') + '</span>'
-        + '<small>' + (lv === 0
-            ? '🆕 새 스킬 — ' + u.kb + ' 키'
-            : 'Lv.' + lv + ' → ' + (lv + 1) + ' (데미지+40%, 쿨-15%)') + '</small>';
+        + (lv === 0
+            ? '<div class="cardNew">🆕 새 스킬 — ' + u.kb + ' 키</div>'
+            : '<div class="cardLv">Lv.' + lv + ' <em>→</em> Lv.' + (lv + 1) + '</div>'
+              + '<div class="cardFx">데미지 +40% · 쿨타임 -15%</div>');
       card.addEventListener('click', () => {
         G.actives[u.key]++;
         SND.unlock();
