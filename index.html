@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="description" content="눈에 보이는 건 전부 부숴라 — 킬링타임용 헐크 스매쉬 게임">
 <title>헐크 스매쉬</title>
 </head>
@@ -348,6 +348,29 @@ addEventListener('resize', resize);
 resize();
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- 모바일 확대(핀치·더블탭) 방지 ---------- */
+(function(){
+  let mv = document.querySelector('meta[name="viewport"]');
+  if (!mv) {
+    mv = document.createElement('meta');
+    mv.name = 'viewport';
+    (document.head || document.documentElement).appendChild(mv);
+  }
+  mv.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+  /* iOS 핀치 줌 */
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) {
+    document.addEventListener(ev, e => e.preventDefault());
+  }
+  /* 더블탭 줌 */
+  document.addEventListener('dblclick', e => e.preventDefault());
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+})();
 
 /* ---------- 소프트 파티클 스프라이트 (연기·먼지·화염) ---------- */
 function makePuff(core, edge){
