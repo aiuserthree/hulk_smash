@@ -702,7 +702,8 @@ const BGM = {
   full(){ if (AC) bgmBus.gain.setTargetAtTime(this.vol, AC.currentTime, 0.25); },
   tick(){
     if (!this.playing) return;
-    const spb = 60 / (G.rageT > 0 ? 122 : 108) / 4; /* 16분음표 — 무겁고 웅장하게 */
+    const Mt = this.mood();
+    const spb = 60 / (G.rageT > 0 ? Mt.tempo + 14 : Mt.tempo) / 4; /* 16분음표 */
     /* 백그라운드 탭에서 돌아온 직후 밀린 노트 몰아치기 방지 */
     if (this.nextT < AC.currentTime - 0.1) this.nextT = AC.currentTime + 0.05;
     while (this.nextT < AC.currentTime + 0.25) {
@@ -733,15 +734,15 @@ const BGM = {
       o.connect(g); g.connect(bgmBus); o.start(t); o.stop(t + 0.15);
       return;
     }
-    const isSnare = kind === 'snare', isOpen = kind === 'open';
+    const isSnare = kind === 'snare', isOpen = kind === 'open', isGhost = kind === 'ghost';
     const src = AC.createBufferSource();
-    src.buffer = noiseBuf(isSnare ? 0.16 : (isOpen ? 0.14 : 0.04));
+    src.buffer = noiseBuf(isSnare ? 0.16 : (isOpen ? 0.14 : (isGhost ? 0.07 : 0.04)));
     const f = AC.createBiquadFilter();
-    f.type = isSnare ? 'bandpass' : 'highpass';
-    f.frequency.value = isSnare ? 1900 : 7500;
+    f.type = (isSnare || isGhost) ? 'bandpass' : 'highpass';
+    f.frequency.value = (isSnare || isGhost) ? 1900 : 7500;
     const g = AC.createGain();
-    g.gain.setValueAtTime(isSnare ? 0.45 : (isOpen ? 0.13 : 0.1), t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + (isSnare ? 0.15 : (isOpen ? 0.13 : 0.035)));
+    g.gain.setValueAtTime(isSnare ? 0.45 : (isOpen ? 0.13 : (isGhost ? 0.17 : 0.1)), t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + (isSnare ? 0.15 : (isOpen ? 0.13 : (isGhost ? 0.06 : 0.035))));
     src.connect(f); f.connect(g); g.connect(bgmBus);
     src.start(t);
     if (isSnare) {
@@ -754,12 +755,24 @@ const BGM = {
     }
   },
   RIFF: [[0,0],[3,0],[4,3],[6,0],[8,7],[10,5],[12,3],[14,-2]],
-  /* 에픽 코드 진행: Em → C → G → D (키 루트 기준 반음) */
-  PROG: [[0, 3, 7], [-4, 0, 3], [3, 7, 10], [-2, 2, 5]],
-  PROGROOT: [0, -4, 3, -2],
-  /* 스트링 패드: 느린 어택 서스테인 코드 */
-  pad(t, semis, dur){
+  /* 테마별 음악 무드 프로필 */
+  MOODS: {
+    city:     { tempo: 108, hats: 2, hornBars: [0, 2], timp: true, march: false, arp: false, trem: false, bass: 'riff', padG: 1,
+                prog: [[0,3,7],[-4,0,3],[3,7,10],[-2,2,5]], progRoot: [0,-4,3,-2] },
+    harbor:   { tempo: 96,  hats: 4, hornBars: [], timp: true, march: false, arp: false, trem: false, bass: 'riff', padG: 1.4,
+                prog: [[0,4,7],[5,9,12],[-3,0,4],[-5,-1,2]], progRoot: [0,5,-3,-5] },
+    neon:     { tempo: 118, hats: 1, hornBars: [], timp: false, march: false, arp: true, trem: false, bass: 'pulse', padG: 0.8,
+                prog: [[0,3,7],[-4,0,3],[5,8,12],[-5,-2,2]], progRoot: [0,-4,5,-5] },
+    storm:    { tempo: 100, hats: 4, hornBars: [0], timp: true, march: false, arp: false, trem: true, bass: 'drone', padG: 1.25,
+                prog: [[0,3,7],[1,5,8],[0,3,7],[-1,2,5]], progRoot: [0,1,0,-1] },
+    military: { tempo: 112, hats: 2, hornBars: [0, 1, 2, 3], timp: true, march: true, arp: false, trem: false, bass: 'riff', padG: 0.9,
+                prog: [[0,3,7],[5,9,12],[0,3,7],[-5,-1,2]], progRoot: [0,5,0,-5] },
+  },
+  mood(){ return this.MOODS[(G.theme && G.theme.mood) || 'city']; },
+  /* 스트링 패드: 느린 어택 서스테인 코드 (trem=트레몰로 현) */
+  pad(t, semis, dur, gMul, trem){
     const root = 82.4 * Math.pow(2, (G.theme.key || 0) / 12) * 2;
+    const gv = 0.034 * (gMul || 1);
     for (const sm of semis) {
       const f = root * Math.pow(2, sm / 12);
       for (const det of [0.996, 1.004]) {
@@ -768,9 +781,15 @@ const BGM = {
         const fl = AC.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 900;
         const g = AC.createGain();
         g.gain.setValueAtTime(0.001, t);
-        g.gain.linearRampToValueAtTime(0.034, t + 0.35);
-        g.gain.setValueAtTime(0.034, t + dur * 0.7);
+        g.gain.linearRampToValueAtTime(gv, t + 0.35);
+        g.gain.setValueAtTime(gv, t + dur * 0.7);
         g.gain.linearRampToValueAtTime(0.001, t + dur);
+        if (trem) {
+          const lfo = AC.createOscillator(); lfo.frequency.value = 6.5;
+          const lg = AC.createGain(); lg.gain.value = gv * 0.55;
+          lfo.connect(lg); lg.connect(g.gain);
+          lfo.start(t); lfo.stop(t + dur);
+        }
         o.connect(fl); fl.connect(g); g.connect(bgmBus);
         o.start(t); o.stop(t + dur + 0.05);
       }
@@ -824,51 +843,78 @@ const BGM = {
   },
   schedule(step, t, spb){
     if (muted) return; /* 음소거 중엔 노드 생성 생략 (박자는 계속 진행) */
+    const M = this.mood();
     const raging = G.rageT > 0;
     const bar = Math.floor(step / 16), s16 = step % 16;
     const root = 82.4 * Math.pow(2, (G.theme.key || 0) / 12);
-    const barRoot = root * Math.pow(2, this.PROGROOT[bar] / 12);
-    /* 드럼 + 팀파니 */
-    if (s16 === 0) this.timp(t);
-    if (s16 === 0 || s16 === 8 || (bar === 3 && s16 === 14)) this.drum(t, 'kick');
+    const barRoot = root * Math.pow(2, M.progRoot[bar] / 12);
+    /* 킥 + 팀파니 */
+    if (s16 === 0 && M.timp) this.timp(t);
+    if (s16 === 0 || s16 === 8 || (bar === 3 && s16 === 14 && !M.trem)) this.drum(t, 'kick');
+    /* 스네어 (군사: 행진 고스트 노트) */
     if (s16 === 4 || s16 === 12) this.drum(t, 'snare');
-    if (raging || step % 2 === 0) this.drum(t, s16 === 6 ? 'open' : 'hat');
-    /* 스트링 패드: 마디마다 코드 체인지 */
-    if (s16 === 0) this.pad(t, this.PROG[bar], spb * 16);
+    if (M.march && (s16 === 6 || s16 === 10 || s16 === 14 || (bar === 3 && s16 === 15))) {
+      this.drum(t, 'ghost');
+    }
+    /* 햇 */
+    const hatEvery = raging ? Math.max(1, M.hats - 1) : M.hats;
+    if (step % hatEvery === 0) this.drum(t, s16 === 6 ? 'open' : 'hat');
+    /* 스트링 패드: 마디마다 코드 체인지 (폭풍: 트레몰로) */
+    if (s16 === 0) this.pad(t, M.prog[bar], spb * 16, M.padG, M.trem);
     /* 혼 스탭 */
-    if ((bar === 0 || bar === 2) && s16 === 0) this.horn(t, [0, 7, 12], spb * 10, barRoot);
-    if (raging && (bar === 1 || bar === 3) && s16 === 8) this.horn(t, [0, 7], spb * 6, barRoot);
+    if (M.hornBars.indexOf(bar) >= 0 && s16 === 0) {
+      this.horn(t, [0, 7, 12], spb * (M.march ? 6 : 10), barRoot);
+    }
+    if (raging && s16 === 8 && (bar === 1 || bar === 3)) this.horn(t, [0, 7], spb * 6, barRoot);
+    /* 폭풍: 루프 말미 팀파니 롤 */
+    if (M.trem && bar === 3 && s16 >= 10 && s16 % 2 === 0) this.timp(t);
     /* 심벌 스웰 → 다음 루프 머리로 고조 */
     if (bar === 3 && s16 === 8) this.swell(t, spb * 8);
-    /* 베이스 리프 (코드 루트를 따라 이동) */
-    const hit = this.RIFF.find(rf => rf[0] === s16);
-    if (hit) {
-      const f = barRoot * Math.pow(2, hit[1] / 12);
-      this.n(t, f, spb * 2.6, 'sawtooth', 0.3, 520);
-      if (raging) this.n(t, f * 2, spb * 2.2, 'square', 0.09, 900);
+    /* 베이스: 테마별 주법 */
+    if (M.bass === 'riff') {
+      const hit = this.RIFF.find(rf => rf[0] === s16);
+      if (hit) {
+        const f = barRoot * Math.pow(2, hit[1] / 12);
+        this.n(t, f, spb * 2.6, 'sawtooth', 0.3, 520);
+        if (raging) this.n(t, f * 2, spb * 2.2, 'square', 0.09, 900);
+      }
+    } else if (M.bass === 'pulse') {
+      /* 네온: 8비트 펄스 베이스 */
+      if (s16 % 2 === 0) this.n(t, barRoot, spb * 1.6, 'sawtooth', s16 % 4 === 0 ? 0.3 : 0.2, 480);
+    } else {
+      /* 폭풍: 낮은 드론 */
+      if (s16 === 0) this.n(t, barRoot * 0.5, spb * 16, 'sawtooth', 0.22, 300);
+    }
+    /* 네온: 16비트 신스 아르페지오 */
+    if (M.arp) {
+      const chord = M.prog[bar];
+      const arpSeq = [0, 1, 2, 1];
+      const sm = chord[arpSeq[s16 % 4] % chord.length];
+      const f = root * 4 * Math.pow(2, sm / 12) * (s16 % 8 >= 4 ? 2 : 1);
+      this.n(t, f, spb * 0.9, 'square', 0.05, 2000);
     }
   },
 };
 
 /* ---------- 스테이지 테마 ---------- */
 const THEMES = [
-  { name:'도심 한복판',   key:0, sky:['#8ed0ff','#e5f6ff'], far:'#b9c7d9', near:'#8fa3bf',
+  { name:'도심 한복판',   key:0, mood:'city', sky:['#8ed0ff','#e5f6ff'], far:'#b9c7d9', near:'#8fa3bf',
     haze:'#eef8ff', grade:'rgba(120,160,255,.05)',
     road:'#5a5f6e', side:'#c9cdd6', lit:false,
     bld:['#d9825f','#c9b458','#7fa8c9','#b76e79','#8ea885'] },
-  { name:'노을 지는 항구', key:5, sky:['#ff9e5e','#ffe0a8'], far:'#c78a6e', near:'#9c6a58',
+  { name:'노을 지는 항구', key:5, mood:'harbor', sky:['#ff9e5e','#ffe0a8'], far:'#c78a6e', near:'#9c6a58',
     haze:'#ffe6b8', grade:'rgba(255,130,50,.1)',
     road:'#665a5e', side:'#d6bfa8', lit:false,
     bld:['#c96a4f','#d9a05f','#a87f9c','#b8925e','#9c7a6a'] },
-  { name:'네온 밤거리',   key:3, sky:['#1b1e3a','#3c2a5e'], far:'#2a2f52', near:'#3d3866',
+  { name:'네온 밤거리',   key:3, mood:'neon', sky:['#1b1e3a','#3c2a5e'], far:'#2a2f52', near:'#3d3866',
     haze:'#4a3a70', grade:'rgba(60,40,120,.13)',
     road:'#33364a', side:'#4a466b', lit:true,
     bld:['#4a5578','#5e4a78','#3d5c6e','#6e4a5c','#52616e'] },
-  { name:'폭풍 전야',     key:-2, sky:['#4a5568','#8c98aa'], far:'#68758c', near:'#55617a',
+  { name:'폭풍 전야',     key:-2, mood:'storm', sky:['#4a5568','#8c98aa'], far:'#68758c', near:'#55617a',
     haze:'#aab4c2', grade:'rgba(70,90,120,.12)',
     road:'#4a4e5e', side:'#8a92a2', lit:false,
     bld:['#7a8598','#8a7a88','#6e8288','#98887a','#788a7e'] },
-  { name:'군사 기지',     key:7, sky:['#7f9c6f','#d8e6c0'], far:'#93a884','near':'#7a9070',
+  { name:'군사 기지',     key:7, mood:'military', sky:['#7f9c6f','#d8e6c0'], far:'#93a884','near':'#7a9070',
     haze:'#e8f0d0', grade:'rgba(150,180,90,.08)',
     road:'#5e6656', side:'#b0bda0', lit:false,
     bld:['#8a9678','#a89e6e','#7e8e88','#9a8a6a','#88987e'] },
@@ -1940,37 +1986,58 @@ function doJump(){
 function doSlam(){
   if (!hasSkill('slam') || H.slamCd > 0 || H.slam || H.dashT > 0 || H.clapT > 0) return;
   H.slam = 1; H.slamCd = 2.6 * Math.pow(0.8, G.upgrades.slam); H.onGround = false;
-  H.vy = -1000;
+  H.vy = -1100;
   H.vx = H.face * 180;
   SND.jump();
   popup(H.x, GROUND - hulkH() - 40, 'METEOR SLAM!!', 30, '#ffd23f');
 }
 function slamImpact(){
-  const r = (230 + G.stage * 15) * (G.rageT > 0 ? 1.3 : 1) * (1 + 0.25 * G.upgrades.slam);
-  const dmg = power() * 2 * (G.rageT > 0 ? 2 : 1);
+  const r = (280 + G.stage * 18) * (G.rageT > 0 ? 1.3 : 1) * (1 + 0.25 * G.upgrades.slam);
+  const dmg = power() * 3 * (G.rageT > 0 ? 2 : 1);
   for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
   hitZombies(H.x - r, H.x + r, 0);
   hitBoss(H.x - r, H.x + r, dmg);
+  /* 3중 충격 링 */
   addRing(H.x, GROUND, r, '#ffd23f', 8);
-  addRing(H.x, GROUND, r * 0.55, '#fff8e7', 5);
-  addBurst(H.x, GROUND - 28, 90);
-  fireball(H.x, GROUND - 18, true);
-  addScorch(H.x, 140);
-  spawnSparks(H.x, GROUND - 18, 1, 9);
-  spawnSparks(H.x, GROUND - 18, -1, 9);
+  addRing(H.x, GROUND, r * 0.62, '#ff9d5e', 6);
+  addRing(H.x, GROUND, r * 0.3, '#fff8e7', 4);
+  addBurst(H.x, GROUND - 28, 110);
+  /* 화염 분출 기둥 */
+  fireball(H.x, GROUND - 20, true);
+  fireball(H.x + rand(-20, 20), GROUND - 120, false);
+  fireball(H.x + rand(-20, 20), GROUND - 210, false);
+  /* 방사형 불티 폭발 */
+  const ne = Math.min(16, 340 - G.particles.length);
+  for (let i = 0; i < ne; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    G.particles.push({
+      x: H.x, y: GROUND - 30,
+      vx: Math.cos(a) * rand(260, 500), vy: Math.sin(a) * rand(100, 240) - 230,
+      size: rand(2, 4.5), color: '', rot: 0, vr: 0,
+      t: 0, life: rand(0.4, 0.85), type: 'ember',
+    });
+  }
+  addScorch(H.x, 180);
+  spawnSparks(H.x, GROUND - 18, 1, 11);
+  spawnSparks(H.x, GROUND - 18, -1, 11);
   addCrack(H.x, r * 0.7);
-  spawnDust(H.x, GROUND, 22, r * 0.5);
-  /* 양방향 여진 지진파 */
+  spawnDust(H.x, GROUND, 24, r * 0.5);
+  /* 양방향 여진 지진파 (강화) */
   for (const d of [1, -1]) G.waves.push({
     x: H.x, dir: d, traveled: r * 0.3,
-    range: r + 200 + G.stage * 12, speed: 750,
-    id: Math.random(), dmg: Math.max(1, Math.ceil(power() * 0.8)), gold: true,
+    range: r + 280 + G.stage * 14, speed: 800,
+    id: Math.random(), dmg: Math.max(1, Math.ceil(power() * 1.2)), gold: true,
   });
-  impact(0.14);
-  zoomKick(0.08);
-  SND.clap(); SND.land();
-  shake(32);
-  G.flash = 0.12;
+  /* 주변 사물 전체 진동 */
+  for (const o2 of G.objects) {
+    if (o2.hp > 0 && Math.abs(o2.x + o2.w / 2 - H.x) < r + 260) o2.wobble = Math.max(o2.wobble, 0.9);
+  }
+  if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.2;
+  impact(0.16);
+  zoomKick(0.09);
+  SND.bigBoom(); SND.clap();
+  shake(36);
+  G.flash = 0.18;
 }
 function doClap(){
   if (!hasSkill('clap') || H.clapCd > 0 || H.clapT > 0 || H.slam || H.dashT > 0) return;
@@ -3278,6 +3345,29 @@ function render(){
   }
 
   drawHulk();
+
+  /* 메테오 낙하: 혜성 화염 오라 */
+  if (H.slam === 2) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const cy = H.y - hulkH() * 0.5;
+    const cg = ctx.createRadialGradient(H.x, cy, 10, H.x, cy, hulkW() * 1.15);
+    cg.addColorStop(0, 'rgba(255,195,95,.55)');
+    cg.addColorStop(0.5, 'rgba(255,120,35,.28)');
+    cg.addColorStop(1, 'rgba(255,90,20,0)');
+    ctx.fillStyle = cg;
+    ctx.fillRect(H.x - hulkW() * 1.15, cy - hulkW() * 1.15, hulkW() * 2.3, hulkW() * 2.3);
+    /* 세로 낙하 스트릭 */
+    ctx.strokeStyle = 'rgba(255,210,120,.5)';
+    ctx.lineWidth = 4;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(H.x + i * hulkW() * 0.45, H.y - hulkH() * 1.5);
+      ctx.lineTo(H.x + i * hulkW() * 0.35, H.y - hulkH() * 0.7);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   /* 토네이도 스핀: 몸을 감는 나선 바람 밴드 */
   if (H.spinT > 0) {
