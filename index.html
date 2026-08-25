@@ -4775,23 +4775,19 @@ function drawHulk(){
     ctx.restore();
   }
   function deltoid(front, shX, shY){
-    const dR = bodyW * (front ? 0.22 : 0.2);
-    const dg = ctx.createRadialGradient(shX + dR * 0.25, shY - dR * 0.35, dR * 0.1, shX, shY, dR);
-    dg.addColorStop(0, front ? P.hi : P.base);
-    dg.addColorStop(0.65, front ? P.base : P.mid);
-    dg.addColorStop(1, front ? P.dark : P.deep);
+    /* 어깨 광택만 — 테두리 있는 원은 그리지 않는다 (실루엣은 팔 캡슐이 담당) */
+    const dR = bodyW * (front ? 0.2 : 0.18);
+    const hiT = raging ? 'rgba(255,157,110,0)' : 'rgba(178,229,108,0)';
+    ctx.save();
+    ctx.globalAlpha = front ? 0.5 : 0.3;
+    const dg = ctx.createRadialGradient(shX + dR * 0.12, shY - dR * 0.28, 2, shX, shY, dR * 0.95);
+    dg.addColorStop(0, P.hi);
+    dg.addColorStop(1, hiT);
     ctx.fillStyle = dg;
-    ctx.beginPath(); ctx.arc(shX, shY, dR, 0, 7); ctx.fill(); ctx.stroke();
-    /* 삼각근 분리선 */
-    if (front) {
-      ctx.save();
-      ctx.strokeStyle = defLine;
-      ctx.lineWidth = outW * 0.5;
-      ctx.beginPath();
-      ctx.arc(shX, shY, dR * 0.92, 0.5, 1.7);
-      ctx.stroke();
-      ctx.restore();
-    }
+    ctx.beginPath();
+    ctx.arc(shX, shY, dR, 0, 7);
+    ctx.fill();
+    ctx.restore();
   }
   function arm(front){
     const [angU, bend, lm] = armPose(front);
@@ -4805,7 +4801,7 @@ function drawHulk(){
     const ex = shX + Math.sin(angU) * upL, ey = shY + Math.cos(angU) * upL;
     const aF = angU + bend;
     const wx = ex + Math.sin(aF) * foL, wy = ey + Math.cos(aF) * foL;
-    limbG(shX, shY, ex, ey, uR * 1.2, uR, sk);
+    limbG(shX, shY, ex, ey, uR * 1.55, uR * 0.95, sk); /* 어깨에서 굵게 시작 → 삼각근 일체형 */
     limbG(ex, ey, wx, wy, fR, wR, sk);
     deltoid(front, shX, shY);
     /* 이두박근 라인 */
@@ -4883,7 +4879,7 @@ function drawHulk(){
     const ex = (shX + hx3) / 2 - ny * bendAmt * elbowSign;
     const ey = (shY + hy3) / 2 + nx * bendAmt * elbowSign;
     const sk = front ? skinF : skinB;
-    limbG(shX, shY, ex, ey, uR * 1.2, uR, sk);
+    limbG(shX, shY, ex, ey, uR * 1.55, uR * 0.95, sk); /* 어깨에서 굵게 시작 → 삼각근 일체형 */
     limbG(ex, ey, hx3, hy3, fR, wR, sk);
     deltoid(front, shX, shY);
     /* 손: 합장은 손바닥(손가락 골), 해머는 각진 주먹 */
