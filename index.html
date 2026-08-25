@@ -71,6 +71,19 @@
   #scoreBox.bump{animation:scorePop .18s}
   @keyframes scorePop{40%{transform:rotate(1.5deg) scale(1.14)}}
 
+  /* 헐크 HP (보스전 전용) */
+  #hpWrap{
+    position:absolute;top:122px;left:14px;width:min(240px,34vw);
+    transform:rotate(-1deg);
+    padding:5px 10px;display:none;
+  }
+  #hpWrap.on{display:block}
+  #hpLabel{font-size:12px;font-family:"Noto Sans KR";font-weight:900;margin-bottom:3px;display:flex;justify-content:space-between;color:var(--green-dk)}
+  #hpBar{height:12px;border:2.5px solid var(--ink);border-radius:6px;background:#e8dfc8;overflow:hidden}
+  #hpFill{height:100%;width:100%;background:linear-gradient(90deg,#2e8b3a,#4cbb4f);transition:width .15s}
+  #hpFill.low{background:linear-gradient(90deg,#b02318,#e03a2a);animation:hpPulse .5s infinite alternate}
+  @keyframes hpPulse{to{filter:brightness(1.5)}}
+
   /* ---------- 스킬 바 ---------- */
   #skills{
     position:absolute;right:14px;bottom:14px;
@@ -249,6 +262,10 @@
       <div id="progressBar"><div id="progressFill"></div></div>
     </div>
     <div id="scoreBox" class="chip"><small>SCORE</small><span id="scoreVal">0</span></div>
+    <div id="hpWrap" class="chip">
+      <div id="hpLabel"><span>헐크</span><span id="hpVal">100</span></div>
+      <div id="hpBar"><div id="hpFill"></div></div>
+    </div>
 
     <div id="skills">
       <div class="skill chip" id="sk-punch"><span class="key">Z</span><div class="name">주먹</div><div class="cd"></div></div>
@@ -305,6 +322,15 @@
       <div id="unlockCard"><div class="t">NEW SKILL!</div><div class="n" id="unlockName"></div></div>
       <div id="growthMsg">💪 헐크가 더 커졌다! 파워 상승!</div>
       <button class="bigbtn" id="nextBtn">다음 동네 부수러 →</button>
+    </div>
+  </div>
+
+  <!-- 패배 (보스전) -->
+  <div class="overlay" id="defeatOv">
+    <div class="panel">
+      <div class="burst-title" style="color:var(--red)">쓰러졌다…</div>
+      <div class="sub">메카가 너무 강했다. 다시 일어나서 부숴버리자!<br>팁: 보스가 번쩍이면 <b>점프</b>로 스톰프를 피하고, 돌진 후 <b>그로기</b> 때 두들겨라.</div>
+      <button class="bigbtn" id="retryBtn">다시 일어나기</button>
     </div>
   </div>
 
@@ -793,6 +819,7 @@ const G = {
   rageT: 0,              // 남은 분노 시간
   rageRamp: 0,           // 변신 팽창 애니메이션 0~1
   rageGrinT: 0,          // 변신 직후 씩 웃는 표정
+  hurtT: 0,              // 피격 붉은 화면 연출
   clearT: 0,
   time: 0,
   camX: 0,
@@ -809,6 +836,8 @@ const H = {
   slamCd: 0,
   knockT: 0, knockVx: 0, // 보스에게 밀려나는 중
   landT: 0,              // 착지 크라우치 연출
+  hp: 100, maxHp: 100,   // 보스 공격에만 깎임
+  invulnT: 0,            // 피격 후 무적시간
   clapT: 0, clapCd: 0,
   dashT: 0, dashCd: 0,
   rageTick: 0,
@@ -896,7 +925,8 @@ const ui = {
   hud: $('hud'), stageNum: $('stageNum'), progressFill: $('progressFill'),
   progressWord: document.querySelector('#progressLabel span'),
   progressCount: $('progressCount'), scoreVal: $('scoreVal'), scoreBox: $('scoreBox'),
-  startOv: $('startOv'), clearOv: $('clearOv'), pauseOv: $('pauseOv'),
+  startOv: $('startOv'), clearOv: $('clearOv'), pauseOv: $('pauseOv'), defeatOv: $('defeatOv'),
+  hpWrap: $('hpWrap'), hpFill: $('hpFill'), hpVal: $('hpVal'),
   clearSub: $('clearSub'), stDestroyed: $('stDestroyed'), stCombo: $('stCombo'),
   stScore: $('stScore'), unlockCard: $('unlockCard'), unlockName: $('unlockName'),
   growthMsg: $('growthMsg'), muteBtn: $('muteBtn'), touch: $('touch'),
@@ -930,6 +960,15 @@ function togglePause(){
 $('startBtn').addEventListener('click', () => { initAudio(); startGame(); });
 $('nextBtn').addEventListener('click', () => { initAudio(); nextStage(); });
 $('resumeBtn').addEventListener('click', () => { initAudio(); togglePause(); });
+$('retryBtn').addEventListener('click', () => {
+  initAudio();
+  ui.defeatOv.classList.remove('on');
+  genStage(G.stage);
+  G.state = 'play';
+  BGM.full();
+  SND.roar();
+  popup(H.x, GROUND - 240, 'HULK SMASH!!', 40, '#4cbb4f');
+});
 $('restartBtn').addEventListener('click', () => { ui.pauseOv.classList.remove('on'); startGame(); });
 
 /* ---------- 스테이지 생성 ---------- */
@@ -993,12 +1032,13 @@ function genStage(n){
     G.objects = [];
     G.total = 0;
     G.worldLen = 1900;
-    const bhp = 90 + n * 30;
+    /* HP는 헐크 파워에 비례 → 스테이지가 올라도 전투 시간 유지 */
+    const bhp = (2 + Math.floor((n - 1) * 1.2)) * 70;
     G.boss = {
       x: 1500, face: -1, w: 170, h: 300,
       hp: bhp, maxHp: bhp,
       state: 'enter', t: 0, stateT: 0,
-      hitFlash: 0, attackCd: 2.5,
+      hitFlash: 0, attackCd: 1.8,
       lastWave: -1, lastDash: -1, hitHulk: false,
       chargeDir: -1, dieT: 0, rot: 0, walkT: 0,
     };
@@ -1032,6 +1072,8 @@ function genStage(n){
   H.punchCd = 0; H.slamCd = 0; H.clapCd = 0; H.dashCd = 0;
   H.punchSeq = 0; H.punchChainT = 0;
   H.knockT = 0; H.knockVx = 0; H.landT = 0;
+  H.hp = H.maxHp; H.invulnT = 0; G.hurtT = 0;
+  updateHpHUD();
   G.camX = 0;
   updateHUD();
   updateSkillLocks();
@@ -1215,21 +1257,53 @@ function hitZombies(lo, hi, dir){
   if (n) {
     SND.zsplat();
     shake(Math.min(2 + n, 6));
+    /* 좀비 흡수: 소량 회복 */
+    if (H.hp < H.maxHp) {
+      H.hp = Math.min(H.maxHp, H.hp + n);
+      updateHpHUD();
+    }
     updateHUD();
   }
   return n;
 }
 
 /* ---------- 보스 (5스테이지마다 1:1 결투) ---------- */
-function hulkKnock(dir){
+function updateHpHUD(){
+  if (!G.boss && G.state !== 'defeat') { ui.hpWrap.classList.remove('on'); return; }
+  ui.hpWrap.classList.add('on');
+  const r = clamp(H.hp / H.maxHp, 0, 1);
+  ui.hpFill.style.width = (r * 100) + '%';
+  ui.hpVal.textContent = Math.ceil(H.hp);
+  ui.hpFill.classList.toggle('low', r < 0.3);
+}
+function hulkKnock(dir, dmg){
+  if (H.invulnT > 0) return;
+  H.invulnT = 0.9;
   H.knockT = 0.35;
   H.knockVx = dir * 640;
   if (H.onGround) { H.vy = -330; H.onGround = false; }
   G.combo = 0; G.comboT = 0;
-  popup(H.x, GROUND - hulkH() - 50, '휘청!!', 30, '#ff8a5a');
-  shake(12);
-  impact(0.05);
+  H.hp = Math.max(0, H.hp - dmg);
+  G.hurtT = 0.4;
+  popup(H.x, GROUND - hulkH() - 50, '-' + dmg, 34, '#ff5a4a');
+  shake(14);
+  impact(0.06);
+  zoomKick(0.04);
   SND.crash();
+  updateHpHUD();
+  if (H.hp <= 0) hulkDown();
+}
+/* HP 0: 쓰러지고 재도전 */
+function hulkDown(){
+  if (G.state !== 'play') return;
+  G.state = 'defeat';
+  G.rageT = 0;
+  if (!reducedMotion) G.slowMo = 0.4;
+  shake(20);
+  G.flash = 0.15;
+  SND.roar(); SND.bigBoom();
+  BGM.duck(0.05);
+  setTimeout(() => { if (G.state === 'defeat') ui.defeatOv.classList.add('on'); }, 1100);
 }
 /* 범위·데미지로 보스 타격. srcField로 파동/돌진 중복 타격 방지 */
 function hitBoss(lo, hi, dmg, srcId, srcField){
@@ -1291,8 +1365,8 @@ function updateBoss(dt){
       b.attackCd -= dt;
       const adx = Math.abs(dx);
       if (adx > 180) {
-        b.x += Math.sign(dx) * 65 * dt;
-        b.walkT += dt * 4;
+        b.x += Math.sign(dx) * 85 * dt;
+        b.walkT += dt * 4.5;
         if (Math.random() < dt * 1.6) { SND.step(); shake(1.5); }
       }
       if (b.attackCd <= 0) {
@@ -1316,8 +1390,8 @@ function updateBoss(dt){
           x: fx2, dir: d, traveled: 20, range: 340, speed: 700,
           id: Math.random(), dmg: 1, gold: true, fromBoss: true,
         });
-        if (H.onGround && Math.abs(H.x - fx2) < 300) hulkKnock(Math.sign(H.x - fx2) || -b.face);
-        b.attackCd = rand(2.4, 3.4);
+        if (H.onGround && Math.abs(H.x - fx2) < 300) hulkKnock(Math.sign(H.x - fx2) || -b.face, 18);
+        b.attackCd = rand(1.6, 2.4);
       }
       break;
     case 'chargePrep':
@@ -1336,10 +1410,10 @@ function updateBoss(dt){
       if (!reducedMotion && Math.random() < 0.7) spawnDust(b.x - b.chargeDir * 70, GROUND, 1, 40);
       if (!b.hitHulk && H.onGround && Math.abs(H.x - b.x) < 110) {
         b.hitHulk = true;
-        hulkKnock(b.chargeDir);
+        hulkKnock(b.chargeDir, 24);
       }
       if (b.stateT <= 0 || b.x <= 131 || b.x >= G.worldLen - 131) {
-        b.state = 'stunned'; b.stateT = 1.4; /* 그로기: 2배 데미지 찬스 */
+        b.state = 'stunned'; b.stateT = 1.8; /* 그로기: 2배 데미지 찬스 */
         spawnSparks(b.x, GROUND - 120, -b.chargeDir, 9);
         popup(b.x, GROUND - b.h - 60, '그로기!', 26, '#ffd23f');
         SND.crash();
@@ -1668,6 +1742,13 @@ function doRage(){
   if (!hasSkill('rage') || G.rage < 100 || G.rageT > 0) return;
   G.rage = 0; G.rageT = 8;
   G.rageGrinT = 0.9; /* "헐크… 스매쉬" — 씩 웃기 */
+  /* 변신하며 상처 회복 */
+  if (H.hp < H.maxHp) {
+    const heal = Math.min(30, H.maxHp - H.hp);
+    H.hp += heal;
+    popup(H.x + 60, GROUND - hulkH() - 40, '+' + heal, 26, '#7de37a');
+    updateHpHUD();
+  }
   SND.roar(); SND.bigBoom();
   shake(26);
   zoomKick(0.1);
@@ -1808,6 +1889,8 @@ function update(dt){
     }
   }
   if (H.landT > 0) H.landT = Math.max(0, H.landT - dt);
+  if (H.invulnT > 0) H.invulnT = Math.max(0, H.invulnT - dt);
+  if (G.hurtT > 0) G.hurtT = Math.max(0, G.hurtT - dt);
 
   /* 분노 접촉 파괴 + 불티 오라 */
   if (G.rageT > 0) {
@@ -2670,6 +2753,16 @@ function render(){
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, W, Hpx);
 
+  /* 피격 붉은 테두리 */
+  if (G.hurtT > 0) {
+    const ha = (G.hurtT / 0.4) * 0.4;
+    const hg2 = ctx.createRadialGradient(W / 2, Hpx / 2, Hpx * 0.32, W / 2, Hpx / 2, Hpx * 0.72);
+    hg2.addColorStop(0, 'rgba(200,30,20,0)');
+    hg2.addColorStop(1, 'rgba(200,30,20,' + ha + ')');
+    ctx.fillStyle = hg2;
+    ctx.fillRect(0, 0, W, Hpx);
+  }
+
   /* 분노 화면 효과 */
   if (G.rageT > 0) {
     const rg = ctx.createRadialGradient(W / 2, Hpx / 2, Hpx * 0.35, W / 2, Hpx / 2, Hpx * 0.75);
@@ -3323,6 +3416,12 @@ function drawHulk(){
   ctx.save();
   ctx.translate(H.x, H.y);
   ctx.scale(H.face, 1);
+  /* 쓰러짐 */
+  if (G.state === 'defeat') ctx.rotate(1.35);
+  /* 피격 무적 깜빡임 */
+  if (H.invulnT > 0 && G.state === 'play' && Math.floor(H.invulnT * 14) % 2 === 0) {
+    ctx.globalAlpha = 0.55;
+  }
   if (raging) {
     ctx.shadowColor = 'rgba(255,75,51,.85)';
     ctx.shadowBlur = 20 + Math.sin(G.time * 9) * 7;
