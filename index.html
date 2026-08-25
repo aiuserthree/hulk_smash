@@ -582,6 +582,14 @@ const SND = {
     pNoise({dur:0.3, type:'bandpass', f0:2300, f1:280, vol:0.5});
     pTone({type:'sine', f0:145, f1:34, dur:0.3, vol:0.6, dist:true});
   },
+  groan(){
+    pTone({type:'sawtooth', f0:110, f1:68, dur:0.7, vol:0.15, vib:[5,18]});
+    pTone({when:0.15, type:'sawtooth', f0:84, f1:52, dur:0.8, vol:0.12, vib:[4,12]});
+  },
+  zsplat(){
+    pNoise({dur:0.09, type:'bandpass', f0:700, vol:0.35});
+    pTone({type:'sine', f0:230, f1:55, dur:0.11, vol:0.28});
+  },
   punchHeavy(){
     const r = rand(0.92, 1.1);
     pTone({type:'sine', f0:130*r, f1:24, dur:0.24, vol:1.0, dist:true});
@@ -757,6 +765,8 @@ const G = {
   remains: [],
   bolts: [],
   pendingBolts: [],
+  zombies: [],
+  zombieSpawnT: 0,
   stars: null,
   skyCols: null,
   rage: 0,               // 0~100 게이지
@@ -922,6 +932,7 @@ function genStage(n){
   G.emitters = []; G.cracks = [];
   G.bursts = []; G.wrecks = []; G.remains = [];
   G.bolts = []; G.pendingBolts = [];
+  G.zombies = []; G.zombieSpawnT = 0;
   G.hitStop = 0; G.slowMo = 0; G.camKick = 0; G.zoomKick = 0;
   G.destroyed = 0; G.stageScore = 0; G.stageDestroyed = 0;
   G.combo = 0; G.comboT = 0; G.maxCombo = 0;
@@ -1105,6 +1116,53 @@ function spawnShards(x, y, count){
     t: 0, life: rand(0.5, 0.9), type: 'shard',
   });
 }
+/* ---------- 좀비 떼 (분노 모드 전용 보너스 먹잇감) ---------- */
+function spawnZombie(side){
+  if (G.zombies.length >= 26) return;
+  G.zombies.push({
+    x: G.camX + (side > 0 ? viewW + rand(20, 240) : -rand(20, 240)),
+    y: GROUND, vx: 0, vy: 0, rot: 0, vr: 0,
+    speed: rand(130, 250), face: -side,
+    h: rand(52, 68), w: rand(20, 26),
+    seed: Math.random(),
+    shirt: pick(['#5a4a6e', '#4a5a4e', '#6e4a4a', '#44506a', '#5c5244']),
+    state: 'walk', t: rand(0, 6),
+    launchT: 0, bounced: false, fleeUntil: 0, dead: false,
+  });
+}
+function spawnHorde(n){
+  for (let i = 0; i < n; i++) spawnZombie(i % 2 === 0 ? 1 : -1);
+}
+/* 범위 내 좀비를 날려버림 (점수 + 콤보 + 분노 연장) */
+function hitZombies(lo, hi, dir){
+  let n = 0;
+  for (const z of G.zombies) {
+    if (z.state === 'launched' || z.dead) continue;
+    if (z.x < lo || z.x > hi) continue;
+    const d = dir || (z.x >= H.x ? 1 : -1);
+    z.state = 'launched';
+    z.launchT = z.t;
+    z.vx = d * rand(420, 780);
+    z.vy = -rand(380, 640);
+    z.vr = d * rand(6, 14);
+    z.bounced = false;
+    n++;
+    const gain = addScore(60);
+    bumpCombo();
+    popup(z.x, GROUND - z.h - 22, pick(['퍽!', '으악!', '털썩!']), 24, '#c9e6a0');
+    popup(z.x + rand(-20, 20), GROUND - z.h - 55, '+' + gain, 17, '#fff8e7');
+    spawnDust(z.x, GROUND - z.h * 0.4, 2, 14);
+    spawnSparks(z.x, GROUND - z.h * 0.6, d, 3);
+    if (G.rageT > 0) G.rageT = Math.min(G.rageT + 0.12, 10);
+  }
+  if (n) {
+    SND.zsplat();
+    shake(Math.min(2 + n, 6));
+    updateHUD();
+  }
+  return n;
+}
+
 /* 낙뢰 (하늘에서 번개 내리꽂기) */
 function spawnBolt(x){
   const top = GROUND - 640;
@@ -1120,6 +1178,7 @@ function spawnBolt(x){
   for (const o of objectsInRange(x - 75, x + 75)) {
     damageObj(o, dmg, clamp(x, o.x, o.x + o.w), true);
   }
+  hitZombies(x - 75, x + 75, 0);
   addBurst(x, GROUND - 30, 72);
   spawnSparks(x, GROUND - 18, 1, 6);
   spawnSparks(x, GROUND - 18, -1, 6);
@@ -1298,6 +1357,7 @@ function doPunch(){
   const [a, b] = frontHitbox(range);
   const targets = objectsInRange(a, b);
   if (heavy) SND.punchHeavy(); else SND.punch();
+  hitZombies(a, b, H.face);
   if (targets.length) {
     const dmg = power() * (heavy ? 2 : 1) * (G.rageT > 0 ? 2 : 1);
     for (const o of targets) damageObj(o, dmg, clamp(H.x + H.face * (hulkW() / 2 + 34), o.x, o.x + o.w));
@@ -1330,6 +1390,7 @@ function slamImpact(){
   const r = (230 + G.stage * 15) * (G.rageT > 0 ? 1.3 : 1);
   const dmg = power() * 2 * (G.rageT > 0 ? 2 : 1);
   for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
+  hitZombies(H.x - r, H.x + r, 0);
   addRing(H.x, GROUND, r, '#ffd23f', 8);
   addRing(H.x, GROUND, r * 0.55, '#fff8e7', 5);
   addBurst(H.x, GROUND - 28, 90);
@@ -1387,6 +1448,10 @@ function doRage(){
   G.flash = 0.2;
   addRing(H.x, GROUND - hulkH() / 2, 380, '#ff4b33', 10);
   popup(H.x, GROUND - hulkH() - 80, '헐크 스매쉬!!!!', 52, '#ff4b33');
+  /* 좀비 떼 습격 */
+  spawnHorde(12 + Math.min(G.stage * 2, 14));
+  popup(H.x, GROUND - hulkH() - 140, '좀비 떼가 몰려온다!!', 30, '#9fe36a');
+  SND.groan();
 }
 
 /* ---------- 업데이트 ---------- */
@@ -1438,6 +1503,7 @@ function update(dt){
       o.lastDash = H.dashId;
       damageObj(o, power() * 3 * (G.rageT > 0 ? 2 : 1), o.x + o.w / 2, true);
     }
+    hitZombies(H.x - hw - 20, H.x + hw + 20, H.face);
     /* 녹색 혜성 트레일 */
     if (!reducedMotion && G.particles.length < 320) {
       for (let i = 0; i < 2; i++) G.particles.push({
@@ -1508,6 +1574,7 @@ function update(dt){
       for (const o of objectsInRange(H.x - hw, H.x + hw)) {
         damageObj(o, power() * 2, o.x + o.w / 2, true);
       }
+      hitZombies(H.x - hw, H.x + hw, 0);
     }
     if (!reducedMotion && G.particles.length < 320 && Math.random() < 0.55) {
       G.particles.push({
@@ -1518,6 +1585,47 @@ function update(dt){
       });
     }
   }
+
+  /* 좀비 떼 AI */
+  if (G.rageT > 0) {
+    G.zombieSpawnT -= dt;
+    if (G.zombieSpawnT <= 0) {
+      G.zombieSpawnT = 0.35;
+      spawnZombie(Math.random() < 0.5 ? 1 : -1);
+      if (Math.random() < 0.18) SND.groan();
+    }
+  } else {
+    /* 분노 종료: 살아남은 좀비는 겁먹고 도주 */
+    for (const z of G.zombies) {
+      if (z.state === 'walk') {
+        z.state = 'flee';
+        z.face = z.x > H.x ? 1 : -1;
+        z.fleeUntil = z.t + rand(1.6, 2.6);
+      }
+    }
+  }
+  for (const z of G.zombies) {
+    z.t += dt;
+    if (z.state === 'walk') {
+      const zd = H.x > z.x ? 1 : -1;
+      z.face = zd;
+      z.x += zd * z.speed * dt;
+    } else if (z.state === 'flee') {
+      z.x += z.face * z.speed * 1.7 * dt;
+      if (z.t > z.fleeUntil) z.dead = true;
+    } else if (z.state === 'launched') {
+      z.vy += 1800 * dt;
+      z.x += z.vx * dt;
+      z.y += z.vy * dt;
+      z.rot += z.vr * dt;
+      if (z.y > GROUND && z.vy > 0 && !z.bounced) {
+        z.y = GROUND; z.vy *= -0.4; z.vx *= 0.7; z.bounced = true;
+        spawnDust(z.x, GROUND, 2, 12);
+      }
+      if (z.t - z.launchT > 1.1) z.dead = true;
+    }
+  }
+  G.zombies = G.zombies.filter(z => !z.dead);
 
   /* 낙뢰 스케줄 */
   for (const pb of G.pendingBolts) {
@@ -1557,6 +1665,7 @@ function update(dt){
         damageObj(o, w.dmg, clamp(front, o.x, o.x + o.w), true);
       }
     }
+    hitZombies(lo - 15, hi + 15, w.dir);
     if (!reducedMotion) spawnDust(front, GROUND, 1, 12);
   }
   G.waves = G.waves.filter(w => w.traveled < w.range);
@@ -2030,6 +2139,13 @@ function render(){
       ctx.beginPath(); ctx.roundRect(-wk.w / 2, -wk.h / 2, wk.w, wk.h, 6); ctx.fill(); ctx.stroke();
     }
     ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+
+  /* 좀비 떼 */
+  for (const z of G.zombies) {
+    if (z.x < G.camX - 60 || z.x > G.camX + viewW + 60) continue;
+    drawZombie(z);
   }
   ctx.globalAlpha = 1;
 
@@ -2657,6 +2773,73 @@ function drawObject(o){
     ctx.roundRect(bx + 1, by + 1, Math.max(3, (bw - 2) * (o.hp / o.maxHp)), 6, 3);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+/* ---------- 좀비 그리기 ---------- */
+function drawZombie(z){
+  const launched = z.state === 'launched';
+  const sway = Math.sin(z.t * 9 + z.seed * 6);
+  ctx.save();
+  ctx.translate(z.x, launched ? z.y : GROUND);
+  if (launched) {
+    ctx.rotate(z.rot);
+    ctx.globalAlpha = clamp(1.6 - (z.t - z.launchT) * 1.45, 0, 1);
+  } else {
+    /* 그림자 */
+    ctx.fillStyle = 'rgba(15,15,25,.2)';
+    ctx.beginPath();
+    ctx.ellipse(0, 2, z.w * 0.8, 4, 0, 0, 7);
+    ctx.fill();
+    ctx.scale(z.face, 1);
+    ctx.rotate(sway * 0.06);
+  }
+  const h = z.h, w = z.w;
+  const zskin = '#a8b88a';
+  const legH2 = h * 0.42, torH = h * 0.42, headR2 = h * 0.16;
+  ctx.strokeStyle = 'rgba(15,18,28,.45)';
+  ctx.lineWidth = 1.6;
+  /* 다리 (비틀비틀) */
+  ctx.fillStyle = '#2e2e38';
+  const legSw = launched ? 0.4 : sway * 0.38;
+  ctx.save();
+  ctx.translate(-w * 0.16, -legH2);
+  ctx.rotate(legSw);
+  ctx.fillRect(-3, 0, 6.5, legH2);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(w * 0.16, -legH2);
+  ctx.rotate(-legSw);
+  ctx.fillRect(-3, 0, 6.5, legH2);
+  ctx.restore();
+  /* 상체 (앞으로 기움) */
+  ctx.save();
+  ctx.translate(0, -legH2);
+  ctx.rotate(launched ? 0.3 : 0.16 + sway * 0.05);
+  ctx.fillStyle = z.shirt;
+  ctx.fillRect(-w / 2, -torH, w, torH);
+  ctx.strokeRect(-w / 2, -torH, w, torH);
+  /* 앞으로 뻗은 두 팔 */
+  ctx.fillStyle = zskin;
+  const armY = -torH * 0.78 + sway * 1.6;
+  ctx.fillRect(w * 0.2, armY, w * 1.15, 4.5);
+  ctx.fillRect(w * 0.2, armY + 8, w * 0.95, 4.5);
+  /* 머리 */
+  ctx.beginPath();
+  ctx.arc(w * 0.14, -torH - headR2 * 0.72, headR2, 0, 7);
+  ctx.fill();
+  ctx.stroke();
+  /* 헝클어진 머리칼 */
+  ctx.fillStyle = '#3a3630';
+  ctx.beginPath();
+  ctx.arc(w * 0.06, -torH - headR2 * 1.05, headR2 * 0.72, Math.PI * 0.9, Math.PI * 2.05);
+  ctx.fill();
+  /* 붉은 눈 */
+  ctx.fillStyle = '#d94436';
+  ctx.beginPath();
+  ctx.arc(w * 0.14 + headR2 * 0.5, -torH - headR2 * 0.72, headR2 * 0.18, 0, 7);
+  ctx.fill();
+  ctx.restore();
   ctx.restore();
 }
 
