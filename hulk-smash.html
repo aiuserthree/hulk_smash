@@ -431,8 +431,9 @@ function resize(){
   cv.width  = Math.floor(innerWidth * dpr);
   cv.height = Math.floor(innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  viewScale = innerHeight / VH;
-  viewW = innerWidth / viewScale;
+  /* 창 크기 0으로 로드되는 엣지 케이스 가드 (Infinity 좌표 방지) */
+  viewScale = Math.max(innerHeight / VH, 0.001);
+  viewW = Math.min(innerWidth / viewScale, 100000);
 }
 addEventListener('resize', resize);
 resize();
@@ -5188,10 +5189,10 @@ function drawHulk(){
     /* 두꺼운 일자 눈썹 바 */
     ctx.save();
     ctx.fillStyle = '#15200a';
-    ctx.translate(hx + headR * 0.5, hy - headR * 0.2 + browDrop);
-    ctx.rotate(0.15);
+    ctx.translate(hx + headR * 0.5, hy - headR * 0.16 + browDrop);
+    ctx.rotate(0.2);
     ctx.beginPath();
-    ctx.roundRect(-headR * 0.36, -headR * 0.1, headR * 0.82, headR * 0.19, headR * 0.05);
+    ctx.roundRect(-headR * 0.34, -headR * 0.1, headR * 0.86, headR * 0.2, headR * 0.05);
     ctx.fill();
     ctx.restore();
     /* 미간 주름 */
@@ -5203,23 +5204,38 @@ function drawHulk(){
     ctx.lineTo(hx + headR * 0.07, hy - headR * 0.02 + browDrop);
     ctx.stroke();
     ctx.restore();
-    /* 눈: 윗눈꺼풀 아래 밝은 연두 눈 */
+    /* 매서운 쐐기형 눈 (눈꼬리 치켜 올라간 슬릿) + 은은한 발광 */
+    const eyeY = hy + headR * 0.05 + browDrop * 0.5;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const eg = ctx.createRadialGradient(hx + headR * 0.56, eyeY, 1, hx + headR * 0.56, eyeY, headR * 0.26);
+    eg.addColorStop(0, raging ? 'rgba(255,200,120,.5)' : 'rgba(190,255,120,.42)');
+    eg.addColorStop(1, 'rgba(120,255,110,0)');
+    ctx.fillStyle = eg;
+    ctx.fillRect(hx + headR * 0.3, eyeY - headR * 0.26, headR * 0.52, headR * 0.52);
+    ctx.restore();
     ctx.fillStyle = raging ? '#ffe089' : '#d9f26a';
     ctx.beginPath();
-    ctx.ellipse(hx + headR * 0.58, hy + headR * 0.06 + browDrop * 0.5, headR * 0.15, headR * 0.1, 0.05, 0, 7);
+    ctx.moveTo(hx + headR * 0.36, eyeY + headR * 0.05);
+    ctx.lineTo(hx + headR * 0.5, eyeY - headR * 0.075);
+    ctx.lineTo(hx + headR * 0.76, eyeY - headR * 0.115);
+    ctx.lineTo(hx + headR * 0.72, eyeY + headR * 0.035);
+    ctx.quadraticCurveTo(hx + headR * 0.5, eyeY + headR * 0.09, hx + headR * 0.36, eyeY + headR * 0.05);
+    ctx.closePath();
     ctx.fill();
     if (!raging) {
       ctx.fillStyle = '#141d08';
       ctx.beginPath();
-      ctx.arc(hx + headR * 0.63, hy + headR * 0.06 + browDrop * 0.5, headR * 0.05, 0, 7);
+      ctx.ellipse(hx + headR * 0.6, eyeY - headR * 0.02, headR * 0.035, headR * 0.055, 0, 0, 7);
       ctx.fill();
     }
+    /* 아랫꺼풀 긴장선 */
     ctx.save();
-    ctx.strokeStyle = 'rgba(21,32,10,.85)';
-    ctx.lineWidth = outW * 0.5;
+    ctx.strokeStyle = 'rgba(21,32,10,.6)';
+    ctx.lineWidth = outW * 0.4;
     ctx.beginPath();
-    ctx.moveTo(hx + headR * 0.42, hy - headR * 0.02 + browDrop);
-    ctx.lineTo(hx + headR * 0.74, hy + headR * 0.02 + browDrop);
+    ctx.moveTo(hx + headR * 0.4, eyeY + headR * 0.1);
+    ctx.lineTo(hx + headR * 0.72, eyeY + headR * 0.06);
     ctx.stroke();
     ctx.restore();
     /* 광대 정의선 */
