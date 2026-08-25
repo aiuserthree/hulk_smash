@@ -2170,6 +2170,15 @@ function update(dt){
   if (!H.onGround) {
     H.vy += (H.slam === 2 ? 4200 : 1900) * dt;
     if (H.slam === 1 && H.vy > -80) { H.slam = 2; H.vy = 300; }
+    /* 도약 바람 스트릭 */
+    if (!H.slam && !reducedMotion && Math.abs(H.vy) > 650 && Math.random() < 0.4 && G.particles.length < 320) {
+      G.particles.push({
+        x: H.x + rand(-22, 22), y: H.y - hulkH() * rand(0.1, 0.8),
+        vx: rand(-15, 15), vy: H.vy > 0 ? -rand(70, 130) : rand(70, 130),
+        size: rand(6, 11), color: '', rot: 0, vr: 0,
+        t: 0, life: rand(0.15, 0.3), type: 'dust',
+      });
+    }
     /* 메테오 낙하 화염 트레일 */
     if (H.slam === 2 && !reducedMotion && G.particles.length < 320) {
       G.particles.push({
@@ -4080,12 +4089,26 @@ function drawHulk(){
   ctx.fill();
   ctx.restore();
 
+  /* 스쿼시 & 스트레치: 도약 시 늘어나고 착지 시 납작 */
+  if (G.state !== 'defeat') {
+    if (!H.onGround) {
+      const st = Math.min(1.12, 1 + Math.abs(H.vy) / 4000);
+      ctx.scale(1 / Math.sqrt(st), st);
+    } else if (H.landT > 0) {
+      const lc = H.landT / 0.26;
+      ctx.scale(1 + lc * 0.12, 1 - lc * 0.1);
+    }
+  }
+
   ctx.strokeStyle = outline;
   ctx.lineJoin = 'round';
   ctx.lineWidth = outW;
 
   const rising = !H.onGround && H.vy < -100;
   const landCr = H.landT > 0 ? H.landT / 0.26 : 0;
+  /* 공중 연속 위상: 0=전력 상승, 1=전력 하강 / 정점에선 무릎 끌어안기 */
+  const airK = !H.onGround ? clamp((clamp(H.vy / 1100, -1, 1) + 1) / 2, 0, 1) : 0;
+  const airTuck = !H.onGround ? 1 - Math.min(1, Math.abs(H.vy) / 700) : 0;
 
   /* 초근육질 체형: 넓은 어깨, 굵은 전완, 짧고 굵은 다리 */
   const legH = bodyH * 0.42;
@@ -4099,8 +4122,7 @@ function drawHulk(){
   if (dashing) lean = 0.3;
   else if (H.slam === 1) lean = -0.16;
   else if (H.slam === 2) lean = 0.2;
-  else if (rising) lean = -0.14;
-  else if (!H.onGround) lean = 0.18;
+  else if (!H.onGround) lean = lerp2(-0.24, 0.3, airK); /* 상승 아치 → 하강 다이브 */
   else if (clapping) lean = clapPh < 0.4 ? -0.1 : 0.14; /* 벌릴 땐 젖히고 칠 땐 싣기 */
   else if (H.roarT > 0) lean = -0.18;
   else if (moving && H.onGround) lean = 0.21; /* 러닝 전경 자세 */
@@ -4124,8 +4146,11 @@ function drawHulk(){
     let thA, knee;
     if (!H.onGround) {
       if (H.slam === 2) { thA = front ? 0.35 : -0.3; knee = 1.0; }
-      else if (rising) { thA = front ? 0.35 : -0.75; knee = front ? 0.55 : 0.25; }
-      else { thA = front ? 0.6 : -0.35; knee = front ? 0.9 : 0.5; }
+      else {
+        /* 도약: 상승(다리 뒤로 쭉) → 정점(턱) → 하강(착지 준비) 연속 보간 */
+        thA = lerp2(front ? 0.30 : -0.85, front ? 0.62 : -0.28, airK) + airTuck * (front ? 0.32 : 0.12);
+        knee = lerp2(front ? 0.45 : 0.2, front ? 0.95 : 0.55, airK) + airTuck * 0.55;
+      }
     } else if (landCr > 0.2) {
       thA = front ? 0.3 : -0.28; knee = 0.55 * landCr + 0.15;
     } else if (moving) {
@@ -4194,8 +4219,10 @@ function drawHulk(){
     if (H.slam === 2) return [1.05, -0.1, 1];
     if (dashing) return front ? [0.3 + Math.sin(t2) * 0.8, 1.25, 1] : [0.3 - Math.sin(t2) * 0.8, 1.25, 1];
     if (!H.onGround) {
-      if (rising) return front ? [-0.55, 0.45, 1] : [-0.95, 0.35, 1];
-      return front ? [1.15, 0.5, 1] : [0.55, 0.65, 1];
+      /* 팔도 궤적 따라 연속 변화: 뒤로 젖힘 → 정점 → 앞으로 뻗기 */
+      return front
+        ? [lerp2(-0.6, 1.25, airK), 0.45 + airTuck * 0.55, 1]
+        : [lerp2(-1.05, 0.6, airK), 0.35 + airTuck * 0.45, 1];
     }
     if (landCr > 0.2) return front ? [0.7, 0.85, 1] : [-0.45, 0.5, 1];
     if (raging && !moving) return front ? [0.8, 1.7, 1] : [-0.7, 1.6, 1];
