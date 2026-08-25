@@ -2278,7 +2278,7 @@ function update(dt){
 
   /* 걷기 애니메이션 + 발걸음 먼지·쿵 소리 */
   if (Math.abs(H.vx) > 10 && H.onGround) {
-    H.walkT += dt * (H.dashT > 0 ? 22 : 11);
+    H.walkT += dt * (H.dashT > 0 ? 22 : 12.5);
     const sgn = Math.sin(H.walkT * 2) >= 0 ? 1 : -1;
     if (H.stepSgn !== undefined && sgn !== H.stepSgn) {
       spawnDust(H.x + sgn * 12, GROUND, 2, 16);
@@ -4031,7 +4031,7 @@ function drawHulk(){
   const t2 = H.walkT * 2;
   const swing = Math.sin(t2) * 0.5;
   const moving = Math.abs(H.vx) > 10;
-  const bob = (H.onGround && moving) ? Math.abs(Math.sin(H.walkT)) * 5 * s
+  const bob = (H.onGround && moving) ? Math.abs(Math.sin(H.walkT)) * (H.dashT > 0 ? 9 : 7) * s
             : Math.sin(G.time * 2.1) * 1.6 * s;
   const pd = H.punchDur || 0.2;
   const punchPh = H.punchT > 0 ? Math.sin((pd - H.punchT) / pd * Math.PI) : 0;
@@ -4103,7 +4103,7 @@ function drawHulk(){
   else if (!H.onGround) lean = 0.18;
   else if (clapping) lean = clapPh < 0.4 ? -0.1 : 0.14; /* 벌릴 땐 젖히고 칠 땐 싣기 */
   else if (H.roarT > 0) lean = -0.18;
-  else if (moving && H.onGround) lean = 0.14;
+  else if (moving && H.onGround) lean = 0.21; /* 러닝 전경 자세 */
   lean += landCr * 0.24;
   if (punchPh > 0 && !hammering) lean += punchPh * 0.12;
   if (hammering) lean += (punchRaw < 0.35 ? -punchRaw * 0.5 : (punchRaw - 0.35) * 0.55);
@@ -4129,9 +4129,11 @@ function drawHulk(){
     } else if (landCr > 0.2) {
       thA = front ? 0.3 : -0.28; knee = 0.55 * landCr + 0.15;
     } else if (moving) {
-      const amp = dashing ? 0.85 : 0.55;
+      /* 러닝 사이클: 큰 보폭 + 회수 다리는 뒤꿈치가 엉덩이까지 접힘 */
+      const amp = dashing ? 0.95 : 0.78;
       thA = amp * Math.sin(t2 + phase);
-      knee = 0.18 + (dashing ? 1.0 : 0.55) * Math.max(0, Math.sin(t2 + phase + 1.15));
+      const rec = Math.max(0, Math.sin(t2 + phase + Math.PI * 0.55));
+      knee = 0.22 + (dashing ? 1.2 : 1.05) * rec * rec;
     } else {
       thA = front ? 0.14 : -0.14; knee = 0.2;
     }
@@ -4197,7 +4199,7 @@ function drawHulk(){
     }
     if (landCr > 0.2) return front ? [0.7, 0.85, 1] : [-0.45, 0.5, 1];
     if (raging && !moving) return front ? [0.8, 1.7, 1] : [-0.7, 1.6, 1];
-    if (moving) return front ? [0.3 - swing * 0.55, 0.45, 1] : [-0.35 + swing * 0.55, 0.42, 1];
+    if (moving) return front ? [0.35 - swing * 0.85, 1.15, 1] : [0.35 + swing * 0.85, 1.15, 1]; /* 러닝: 굽힌 팔 펌핑 */
     return front ? [0.3, 0.36, 1] : [-0.38, 0.32, 1];
   }
   function deltoid(front, shX, shY){
