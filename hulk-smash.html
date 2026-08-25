@@ -1527,6 +1527,13 @@ function hitBoss(lo, hi, dmg, srcId, srcField){
     b.hp = 0;
     b.state = 'dying';
     b.dieT = 0;
+    /* 마무리 일격: 시간이 멈추는 순간 */
+    G.flash = 0.25;
+    impact(0.2);
+    zoomKick(0.1);
+    if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.45;
+    popup(b.x, GROUND - b.h - 90, 'FINISH!!', 54, '#ffd23f');
+    SND.bigBoom();
     SND.roar();
   }
   updateHUD();
@@ -1692,26 +1699,65 @@ function updateBoss(dt){
       break;
     case 'dying':
       b.dieT += dt;
-      b.rot = Math.min(1.35, b.dieT * 1.1);
-      if (b.dieT % 0.28 < dt && G.particles.length < 320) {
-        fireball(b.x + rand(-70, 70), GROUND - rand(60, 240), false);
+      b.rot = Math.min(1.35, b.dieT * 0.95);
+      /* 연쇄 폭발 가속 + 섬광 점멸 + 연기 상승 */
+      if (b.dieT % 0.22 < dt && G.particles.length < 310) {
+        fireball(b.x + rand(-80, 80), GROUND - rand(50, b.h * 0.9), false);
+        b.hitFlash = 0.09;
+        spawnSparks(b.x + rand(-60, 60), GROUND - rand(60, 180), Math.random() < 0.5 ? 1 : -1, 5);
         SND.crash();
-        shake(6);
+        shake(9);
+        for (let i = 0; i < 2; i++) G.particles.push({
+          x: b.x + rand(-70, 70), y: GROUND - rand(40, b.h * 0.8),
+          vx: rand(-25, 25), vy: -rand(80, 180),
+          size: rand(13, 24), color: '', rot: 0, vr: 0,
+          t: 0, life: rand(0.8, 1.5), type: 'smoke',
+        });
       }
-      if (b.dieT > 2.0 && !G.bossDefeated) {
+      if (b.dieT > 2.4 && !G.bossDefeated) {
         G.bossDefeated = true;
-        fireball(b.x, GROUND - 80, true);
-        addScorch(b.x, 220);
-        addRubble(b.x, 200);
-        SND.bigBoom(); shake(30); zoomKick(0.09); G.flash = 0.2;
-        if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.35;
+        /* 최종 대폭발: 3단 화염 스택 + 버섯구름 + 방사 불티 */
+        fireball(b.x, GROUND - 60, true);
+        fireball(b.x + rand(-30, 30), GROUND - 160, true);
+        fireball(b.x + rand(-30, 30), GROUND - 250, false);
+        const ne = Math.min(24, 340 - G.particles.length);
+        for (let i = 0; i < ne; i++) {
+          const a = (i / 24) * Math.PI * 2;
+          G.particles.push({
+            x: b.x, y: GROUND - 120,
+            vx: Math.cos(a) * rand(280, 560), vy: Math.sin(a) * rand(200, 380) - 180,
+            size: rand(2.5, 5), color: '', rot: 0, vr: 0,
+            t: 0, life: rand(0.5, 1.0), type: 'ember',
+          });
+        }
+        for (let i = 0; i < 8 && G.particles.length < 335; i++) G.particles.push({
+          x: b.x + rand(-50, 50), y: GROUND - rand(100, 260),
+          vx: rand(-40, 40), vy: -rand(120, 260),
+          size: rand(18, 32), color: '', rot: 0, vr: 0,
+          t: 0, life: rand(1.2, 2.0), type: 'smoke',
+        });
+        addRing(b.x, GROUND, 320, '#ffd23f', 9);
+        addRing(b.x, GROUND, 210, '#ff9d5e', 6);
+        addRing(b.x, GROUND, 110, '#fff8e7', 4);
+        spawnDebris(b.x - 100, GROUND, 200, b.h * 0.6, '#57504a', 26, 520);
+        addScorch(b.x, 240);
+        addRubble(b.x, 210);
+        SND.bigBoom(); SND.thunder();
+        shake(42);
+        zoomKick(0.12);
+        impact(0.18);
+        G.flash = 0.3;
+        if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.5;
+        /* 헐크 승리 포효 */
+        H.roarT = 0.7;
+        G.rageGrinT = 1.2;
         const gain = addScore(5000);
-        popup(b.x, GROUND - 260, '+' + gain, 42, '#fff8e7');
-        popup(H.x, GROUND - hulkH() - 90, '보스 격파!!', 46, '#4cbb4f');
+        popup(b.x, GROUND - 280, '+' + gain, 44, '#fff8e7');
+        popup(H.x, GROUND - hulkH() - 100, 'BOSS DOWN!!', 58, '#4cbb4f');
         SND.roar();
         G.boss = null;
         G.state = 'clearing';
-        G.clearT = 1.3;
+        G.clearT = 2.0;
       }
       break;
   }
