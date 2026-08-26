@@ -248,6 +248,26 @@
   /* ---------- 일시정지 ---------- */
   #pauseOv .panel{max-width:360px}
 
+  /* ---------- 세로 모드 → 가로 권장 안내 ---------- */
+  #rotateOv{background:rgba(12,14,22,.9);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+  #rotateOv .rphone{
+    width:44px;height:72px;border-radius:10px;margin-bottom:28px;
+    border:3.5px solid rgba(240,245,252,.9);
+    box-shadow:0 0 22px rgba(90,235,105,.35), inset 0 0 10px rgba(255,255,255,.08);
+    animation:rturn 2s ease-in-out infinite;
+  }
+  @keyframes rturn{
+    0%, 22%{transform:rotate(0)}
+    55%, 88%{transform:rotate(-90deg)}
+    100%{transform:rotate(0)}
+  }
+  #rotateOv .rmsg{font-family:"Black Han Sans";font-size:27px;color:#fff8e7;margin-bottom:8px}
+  #rotateOv .rsub{font-size:14px;color:rgba(238,242,248,.65);margin-bottom:26px}
+  #rotateSkip{
+    font-family:"Black Han Sans";font-size:15px;padding:10px 24px;border-radius:26px;cursor:pointer;
+    background:rgba(40,45,62,.6);border:1.5px solid rgba(255,255,255,.28);color:rgba(238,242,248,.9);
+  }
+
   /* ---------- 터치 컨트롤 ---------- */
   #touch{position:absolute;inset:0;pointer-events:none;display:none}
   body.touchmode #touch.on{display:block}
@@ -270,19 +290,37 @@
     box-shadow:inset 0 1px 1px rgba(255,255,255,.22), 0 0 18px rgba(90,235,105,.5);
     background:radial-gradient(circle at 32% 26%, rgba(64,112,66,.7), rgba(20,42,24,.82) 72%);
   }
-  #tLeft {left:16px;  bottom:78px;width:64px;height:64px}
-  #tRight{left:96px;  bottom:78px;width:64px;height:64px}
-  /* ◀▶ 대신 CSS 셰브런 화살표 */
-  #tLeft, #tRight{font-size:0}
-  #tLeft::before, #tRight::before{
-    content:'';display:block;width:30%;height:30%;
-    border-top:4px solid rgba(240,245,252,.92);
-    border-left:4px solid rgba(240,245,252,.92);
-    border-radius:2.5px;
+  /* 좌우 이동: 슬라이드 패드 — 터치한 지점에서 좌우로 쓸면 이동 */
+  #tPad{
+    position:absolute;pointer-events:auto;touch-action:none;
+    /* 초소형 세로(360px 등)에서 우측 점프 버튼과 안 겹치게 폭 자동 축소 */
+    left:16px;bottom:78px;width:min(176px, max(120px, calc(100vw - 198px)));height:68px;border-radius:34px;
+    background:linear-gradient(180deg, rgba(40,45,62,.55), rgba(16,18,28,.72));
+    border:1.5px solid rgba(255,255,255,.22);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.16), inset 0 -6px 12px rgba(0,0,0,.32), 0 4px 14px rgba(0,0,0,.4);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   }
-  #tLeft::before {transform:translateX(18%) rotate(-45deg)}
-  #tRight::before{transform:translateX(-18%) rotate(135deg)}
-  #tLeft:active::before, #tRight:active::before{border-color:#9dff9a}
+  /* 양끝 셰브런 힌트 */
+  #tPad::before, #tPad::after{
+    content:'';position:absolute;top:50%;width:13px;height:13px;margin-top:-8px;
+    border-top:3.5px solid rgba(240,245,252,.45);
+    border-left:3.5px solid rgba(240,245,252,.45);
+    border-radius:2px;
+  }
+  #tPad::before{left:15px;transform:rotate(-45deg)}
+  #tPad::after{right:15px;transform:rotate(135deg)}
+  #tPadKnob{
+    position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
+    border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle at 32% 26%, rgba(76,84,110,.88), rgba(30,34,48,.94) 72%);
+    border:1.5px solid rgba(255,255,255,.3);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.25), 0 2px 8px rgba(0,0,0,.5);
+    transition:transform .05s linear;
+  }
+  #tPad.on #tPadKnob{
+    border-color:rgba(140,255,150,.85);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.25), 0 0 16px rgba(90,235,105,.55);
+  }
   #tJump {right:116px;bottom:78px;width:58px;height:58px;font-size:14px}
   #tPunch{
     right:20px; bottom:70px;width:84px;height:84px;font-size:18px;color:#f2fff0;
@@ -332,24 +370,28 @@
     #pauseBtn{left:58px;bottom:8px}
     .panel{padding:16px 22px}
     .burst-title{font-size:clamp(28px,6vh,44px)}
-    /* 가로: 좌우 이동 버튼 대형화 */
-    #tLeft {left:14px; bottom:14px;width:78px;height:78px}
-    #tRight{left:104px;bottom:14px;width:78px;height:78px}
-    #tJump {right:100px;bottom:18px;width:52px;height:52px;font-size:12px}
-    #tPunch{right:16px;bottom:12px;width:74px;height:74px;font-size:16px}
+    /* 가로: 슬라이드 패드 대형화 + 노치·홈바 safe-area 회피 */
+    #tPad{
+      left:max(14px, env(safe-area-inset-left, 0px));
+      bottom:max(14px, env(safe-area-inset-bottom, 0px));
+      width:min(224px, calc(100vw - 174px));height:82px;border-radius:41px;
+    }
+    #tPadKnob{width:62px;height:62px;margin:-31px 0 0 -31px}
+    #tJump {right:calc(84px + max(16px, env(safe-area-inset-right, 0px)));bottom:max(18px, env(safe-area-inset-bottom, 0px));width:52px;height:52px;font-size:12px}
+    #tPunch{right:max(16px, env(safe-area-inset-right, 0px));bottom:max(12px, env(safe-area-inset-bottom, 0px));width:74px;height:74px;font-size:16px}
     .tskill{width:46px;height:46px;font-size:10.5px}
-    /* 가로: 그리드를 우측 가장자리(주먹 위)에 3×3로 */
-    #tSlam {right:124px;bottom:100px}
-    #tClap {right:70px; bottom:100px}
-    #tDash {right:16px; bottom:100px}
-    #tRage {right:124px;bottom:154px}
-    #tQuake{right:70px; bottom:154px}
-    #tThrow{right:16px; bottom:154px}
-    #tRoar {right:124px;bottom:208px}
-    #tSpin {right:70px; bottom:208px}
-    #tStomp{right:16px; bottom:208px}
-    body.touchmode #muteBtn{top:8px;right:118px;left:auto;bottom:auto}
-    body.touchmode #pauseBtn{top:8px;right:166px;left:auto;bottom:auto}
+    /* 가로: 그리드를 우측 가장자리(주먹 위)에 3×3로 — safe-area만큼 안쪽으로 */
+    #tSlam {right:calc(108px + max(16px, env(safe-area-inset-right, 0px)));bottom:100px}
+    #tClap {right:calc(54px + max(16px, env(safe-area-inset-right, 0px)));bottom:100px}
+    #tDash {right:max(16px, env(safe-area-inset-right, 0px));bottom:100px}
+    #tRage {right:calc(108px + max(16px, env(safe-area-inset-right, 0px)));bottom:154px}
+    #tQuake{right:calc(54px + max(16px, env(safe-area-inset-right, 0px)));bottom:154px}
+    #tThrow{right:max(16px, env(safe-area-inset-right, 0px));bottom:154px}
+    #tRoar {right:calc(108px + max(16px, env(safe-area-inset-right, 0px)));bottom:208px}
+    #tSpin {right:calc(54px + max(16px, env(safe-area-inset-right, 0px)));bottom:208px}
+    #tStomp{right:max(16px, env(safe-area-inset-right, 0px));bottom:208px}
+    body.touchmode #muteBtn{top:8px;right:calc(102px + max(16px, env(safe-area-inset-right, 0px)));left:auto;bottom:auto}
+    body.touchmode #pauseBtn{top:8px;right:calc(150px + max(16px, env(safe-area-inset-right, 0px)));left:auto;bottom:auto}
     /* 가로: 팝업 패널을 스크롤 없이 한 화면에 압축 */
     .panel{padding:10px 20px;max-width:min(560px,92vw)}
     .burst-title{font-size:24px;text-shadow:3px 3px 0 var(--ink);-webkit-text-stroke:1.5px var(--ink);margin-bottom:2px}
@@ -415,9 +457,8 @@
 
   <!-- 터치 컨트롤 -->
   <div id="touch">
-    <div class="tbtn" id="tLeft">◀</div>
-    <div class="tbtn" id="tRight">▶</div>
-    <div class="tbtn" id="tJump">파운드</div>
+    <div id="tPad"><div id="tPadKnob"></div></div>
+    <div class="tbtn" id="tJump">점프</div>
     <div class="tbtn" id="tPunch">주먹!<span class="lv"></span></div>
     <div class="tbtn tskill locked" id="tSlam">메테오<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill locked" id="tClap">박수<span class="tcd"></span><span class="lv"></span></div>
@@ -437,7 +478,7 @@
       <div class="sub">눈에 보이는 건 전부 부숴라. 다 부수면 다음 스테이지!<br>스테이지가 오를수록 헐크는 더 커지고, 더 강해진다.</div>
       <div class="ctrl-grid">
         <span class="kb">← →</span><span>이동</span>
-        <span class="kb">↑</span><span>그라운드 파운드 — 두 주먹으로 바닥 강타</span>
+        <span class="kb">↑</span><span>점프 — 착지 시 미니 슬램 충격파</span>
         <span class="kb">Z / SPACE</span><span>주먹 연타 — 꾹 누르면 잽·훅·해머 콤보</span>
         <span class="kb locked">X</span><span class="locked-row">메테오 슬램 — STAGE 2 해제</span>
         <span class="kb locked">C</span><span class="locked-row">합장 박수 — STAGE 3 해제</span>
@@ -472,7 +513,7 @@
   <div class="overlay" id="defeatOv">
     <div class="panel">
       <div class="burst-title" style="color:var(--red)">쓰러졌다…</div>
-      <div class="sub">보스가 너무 강했다. 다시 일어나서 부숴버리자!<br>팁: 예고 동작이 보이면 <b>이동</b>이나 <b>돌진</b>으로 피하고, <b>그로기·재장전</b> 틈에 두들겨라.</div>
+      <div class="sub">보스가 너무 강했다. 다시 일어나서 부숴버리자!<br>팁: 예고 동작이 보이면 <b>점프</b>나 <b>이동</b>으로 피하고, <b>그로기·재장전</b> 틈에 두들겨라.</div>
       <button class="bigbtn" id="retryBtn">다시 일어나기</button>
     </div>
   </div>
@@ -486,6 +527,12 @@
         <button class="bigbtn" id="restartBtn" style="background:#c9b458">처음부터</button>
       </div>
     </div>
+  </div>
+  <div class="overlay" id="rotateOv">
+    <div class="rphone"></div>
+    <div class="rmsg">가로 모드로 돌려주세요!</div>
+    <div class="rsub">헐크 스매쉬는 가로 화면에 최적화되어 있습니다</div>
+    <button id="rotateSkip">세로로 계속하기</button>
   </div>
 </div>
 
@@ -1108,7 +1155,6 @@ const H = {
   stompN: 0, stompT: 0, stompCd: 0,
   clapT: 0, clapCd: 0,
   dashT: 0, dashCd: 0,
-  poundCd: 0,
   rageTick: 0,
   baseH: 130, baseW: 88,
 };
@@ -1129,6 +1175,13 @@ const hasSkill = s => G.stage >= UNLOCK_STAGE[s];
 /* ---------- 입력 ---------- */
 const input = { left:false, right:false, punch:false };
 const pressQueue = [];      // 한 번 누름 액션
+/* 이동 입력 합성: 키보드·슬라이드 패드가 서로 덮어쓰지 않도록 소스별 추적 */
+const moveSrc = { kbL: false, kbR: false, padL: false, padR: false };
+function applyMove(){
+  input.left = moveSrc.kbL || moveSrc.padL;
+  input.right = moveSrc.kbR || moveSrc.padR;
+}
+let padForceRelease = () => {};
 
 addEventListener('keydown', e => {
   const c = e.code;
@@ -1136,9 +1189,9 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   initAudio();
   switch (c) {
-    case 'ArrowLeft': case 'KeyA': input.left = true; break;
-    case 'ArrowRight': case 'KeyD': input.right = true; break;
-    case 'ArrowUp': case 'KeyW': pressQueue.push('pound'); break;
+    case 'ArrowLeft': case 'KeyA': moveSrc.kbL = true; applyMove(); break;
+    case 'ArrowRight': case 'KeyD': moveSrc.kbR = true; applyMove(); break;
+    case 'ArrowUp': case 'KeyW': pressQueue.push('jump'); break;
     case 'Space': case 'KeyZ': case 'KeyJ': input.punch = true; pressQueue.push('punch'); break;
     case 'KeyX': case 'KeyK': pressQueue.push('slam'); break;
     case 'KeyC': case 'KeyL': pressQueue.push('clap'); break;
@@ -1155,14 +1208,17 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => {
   switch (e.code) {
-    case 'ArrowLeft': case 'KeyA': input.left = false; break;
-    case 'ArrowRight': case 'KeyD': input.right = false; break;
+    case 'ArrowLeft': case 'KeyA': moveSrc.kbL = false; applyMove(); break;
+    case 'ArrowRight': case 'KeyD': moveSrc.kbR = false; applyMove(); break;
     case 'Space': case 'KeyZ': case 'KeyJ': input.punch = false; break;
   }
 });
 /* 포커스 이탈 시 키 고착 방지 */
 function resetHeldInput(){
-  input.left = false; input.right = false; input.punch = false;
+  moveSrc.kbL = moveSrc.kbR = false;
+  padForceRelease();               /* 패드 드래그·knob 시각 상태까지 해제 */
+  applyMove();
+  input.punch = false;
   pressQueue.length = 0;
 }
 addEventListener('blur', resetHeldInput);
@@ -1188,9 +1244,43 @@ function bindTap(id, act){
     e.preventDefault(); initAudio(); pressQueue.push(act);
   });
 }
-bindHold('tLeft',  () => input.left = true,  () => input.left = false);
-bindHold('tRight', () => input.right = true, () => input.right = false);
-bindTap('tJump', 'pound');
+/* 슬라이드 패드: 누른 지점을 기준으로 좌우로 쓸면 이동 (탭 아님) */
+(function(){
+  const pad = document.getElementById('tPad');
+  const knob = document.getElementById('tPadKnob');
+  let pid = null, x0 = 0;
+  const DEAD = 10; /* px — 이 이상 쓸어야 이동 시작 */
+  function setDir(dx){
+    moveSrc.padL = dx < -DEAD;
+    moveSrc.padR = dx > DEAD;
+    applyMove();
+    const maxD = (pad.clientWidth - knob.clientWidth) / 2 - 7;
+    knob.style.transform = 'translateX(' + clamp(dx, -maxD, maxD) + 'px)';
+  }
+  function release(){
+    pid = null;
+    moveSrc.padL = moveSrc.padR = false;
+    applyMove();
+    pad.classList.remove('on');
+    knob.style.transform = '';
+  }
+  padForceRelease = release;
+  pad.addEventListener('pointerdown', e => {
+    if (pid !== null) return; /* 이미 드래그 중이면 두 번째 손가락 무시 */
+    e.preventDefault(); initAudio();
+    pid = e.pointerId; x0 = e.clientX;
+    try { pad.setPointerCapture(pid); } catch (_) {}
+    pad.classList.add('on');
+    setDir(0);
+  });
+  pad.addEventListener('pointermove', e => {
+    if (pid === null || e.pointerId !== pid) return;
+    setDir(e.clientX - x0);
+  });
+  pad.addEventListener('pointerup', e => { if (e.pointerId === pid) release(); });
+  pad.addEventListener('pointercancel', e => { if (e.pointerId === pid) release(); });
+})();
+bindTap('tJump', 'jump');
 bindHold('tPunch', () => { input.punch = true; pressQueue.push('punch'); }, () => input.punch = false);
 bindTap('tSlam', 'slam');
 bindTap('tClap', 'clap');
@@ -1201,6 +1291,25 @@ bindTap('tThrow', 'throwSteel');
 bindTap('tRoar', 'roar');
 bindTap('tSpin', 'spin');
 bindTap('tStomp', 'stomp');
+
+/* 모바일 세로 모드: 가로 회전 권장 안내 (플레이 중 세로로 돌리면 자동 일시정지) */
+const rotateOv = document.getElementById('rotateOv');
+let rotateDismissed = false;
+function checkOrientation(){
+  const show = isTouch && !rotateDismissed && innerHeight > innerWidth;
+  const was = rotateOv.classList.contains('on');
+  rotateOv.classList.toggle('on', show);
+  if (show && !was && G.state === 'play') togglePause();
+}
+document.getElementById('rotateSkip').addEventListener('pointerdown', e => {
+  e.preventDefault(); rotateDismissed = true; rotateOv.classList.remove('on');
+});
+addEventListener('resize', checkOrientation);
+addEventListener('orientationchange', () => setTimeout(checkOrientation, 80));
+const orientMq = matchMedia('(orientation: portrait)');
+if (orientMq.addEventListener) orientMq.addEventListener('change', checkOrientation);
+else if (orientMq.addListener) orientMq.addListener(checkOrientation);
+checkOrientation();
 
 /* ---------- UI 참조 ---------- */
 const $ = id => document.getElementById(id);
@@ -1370,7 +1479,7 @@ function genStage(n){
 
   H.x = 200; H.y = GROUND; H.vx = 0; H.vy = 0; H.face = 1;
   H.onGround = true; H.punchT = 0; H.slam = 0; H.clapT = 0; H.dashT = 0;
-  H.punchCd = 0; H.slamCd = 0; H.clapCd = 0; H.dashCd = 0; H.poundCd = 0;
+  H.punchCd = 0; H.slamCd = 0; H.clapCd = 0; H.dashCd = 0;
   H.punchSeq = 0; H.punchChainT = 0;
   H.knockT = 0; H.knockVx = 0; H.landT = 0;
   H.quakeCd = 0; H.throwCd = 0; H.roarCd = 0; H.roarT = 0;
@@ -1703,10 +1812,10 @@ function updateBoss(dt){
       }
       if (b.attackCd <= 0) {
         if (b.type === 'mech') {
-          if (adx < 280) { b.state = 'windup'; b.stateT = 0.72; }
+          if (adx < 280) { b.state = 'windup'; b.stateT = 0.6; }
           else { b.state = 'chargePrep'; b.stateT = 0.65; }
         } else if (b.type === 'beast') {
-          if (adx < 280) { b.state = 'windup'; b.stateT = 0.72; }
+          if (adx < 280) { b.state = 'windup'; b.stateT = 0.6; }
           else if (Math.random() < 0.5) { b.state = 'throw'; b.stateT = 0.7; }
           else { b.state = 'leapPrep'; b.stateT = 0.5; }
         } else { /* tank */
@@ -1773,7 +1882,7 @@ function updateBoss(dt){
     case 'windup':
       b.stateT -= dt;
       if (b.stateT <= 0) {
-        /* 스톰프: 이동으로 범위 밖 회피 가능 */
+        /* 스톰프: 점프로 회피 가능 */
         b.state = 'recover'; b.stateT = 0.9;
         const fx2 = b.x + b.face * 60;
         addRing(fx2, GROUND, 280, '#ffd23f', 8);
@@ -1785,7 +1894,7 @@ function updateBoss(dt){
           x: fx2, dir: d, traveled: 20, range: 340, speed: 700,
           id: Math.random(), dmg: 1, gold: true, fromBoss: true,
         });
-        if (H.onGround && Math.abs(H.x - fx2) < 240) hulkKnock(Math.sign(H.x - fx2) || -b.face, 18 + b.atkBonus);
+        if (H.onGround && Math.abs(H.x - fx2) < 300) hulkKnock(Math.sign(H.x - fx2) || -b.face, 18 + b.atkBonus);
         b.attackCd = rand(1.6, 2.4) * b.cdScale;
       }
       break;
@@ -2157,32 +2266,19 @@ function doPunch(){
     SND.whoosh();
   }
 }
-/* 그라운드 파운드: 두 주먹을 바닥에 내리쳐 즉발 광역 충격파 (점프 대체) */
-function doPound(){
-  if (H.poundCd > 0 || H.slam || H.clapT > 0 || H.dashT > 0 || !H.onGround) return;
-  H.poundCd = 1.1;
-  /* 양손 해머 내려찍기 모션 재활용 */
-  H.punchSeq = 2; H.punchDur = 0.28; H.punchT = 0.28; H.punchChainT = 0;
-  H.landT = Math.max(H.landT, 0.24);
-  const r = (155 + G.stage * 8) * (0.7 + hulkScale() * 0.3) * (G.rageT > 0 ? 1.25 : 1);
-  const dmg = Math.max(1, Math.ceil(power() * 1.2)) * (G.rageT > 0 ? 2 : 1);
-  for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
-  hitZombies(H.x - r, H.x + r, 0);
-  hitBoss(H.x - r, H.x + r, dmg);
-  for (const d of [1, -1]) G.waves.push({
-    x: H.x, dir: d, traveled: 24, range: r + 70, speed: 880,
-    id: Math.random(), dmg: 1, gold: true,
-  });
-  addRing(H.x, GROUND, r, '#ffd23f', 6);
-  addRing(H.x, GROUND, r * 0.5, '#fff8e7', 4);
-  addCrack(H.x, r * 0.5);
-  spawnDust(H.x, GROUND, 9, r * 0.4);
-  spawnSparks(H.x, GROUND - 16, 1, 6);
-  spawnSparks(H.x, GROUND - 16, -1, 6);
-  shake(14);
-  impact(0.06);
-  zoomKick(0.04);
-  SND.land(); SND.boom();
+function doJump(){
+  if (!H.onGround || H.slam) return;
+  /* 헐크식 거대 도약 — 착지 반동 타이밍에 다시 뛰면 슈퍼 도약 */
+  const springboard = H.landT > 0;
+  H.vy = springboard ? -1250 : -1020;
+  H.onGround = false;
+  H.landT = 0;
+  spawnDust(H.x, GROUND, springboard ? 10 : 6, springboard ? 55 : 40);
+  if (springboard) {
+    popup(H.x, GROUND - hulkH() - 40, 'LEAP!', 26, '#9fe36a');
+    addRing(H.x, GROUND, 70, '#fff8e7', 4);
+  }
+  SND.jump();
 }
 function doSlam(){
   if (!hasSkill('slam') || H.slamCd > 0 || H.slam || H.dashT > 0 || H.clapT > 0) return;
@@ -2439,7 +2535,7 @@ function update(dt){
     const a = pressQueue.shift();
     if (G.state !== 'play') continue;
     if (a === 'punch') doPunch();
-    else if (a === 'pound') doPound();
+    else if (a === 'jump') doJump();
     else if (a === 'slam') doSlam();
     else if (a === 'clap') doClap();
     else if (a === 'dash') doDash();
@@ -2472,7 +2568,6 @@ function update(dt){
   H.slamCd = Math.max(0, H.slamCd - dt);
   H.clapCd = Math.max(0, H.clapCd - dt);
   H.dashCd = Math.max(0, H.dashCd - dt);
-  H.poundCd = Math.max(0, H.poundCd - dt);
   if (wasSlamCd > 0 && H.slamCd === 0) flashReady('slam');
   if (wasClapCd > 0 && H.clapCd === 0) flashReady('clap');
   if (wasDashCd > 0 && H.dashCd === 0) flashReady('dash');
@@ -4294,7 +4389,7 @@ function drawMechBody(b){
   if (b.state === 'charge') ctx.rotate(0.2);
   else if (b.state === 'chargePrep') ctx.rotate(-0.1);
   else if (b.state === 'stunned') ctx.rotate(Math.sin(b.t * 18) * 0.03 + 0.08);
-  const crouch = b.state === 'windup' ? clamp((0.72 - b.stateT) / 0.72, 0, 1) * 20 : 0;
+  const crouch = b.state === 'windup' ? clamp((0.6 - b.stateT) / 0.6, 0, 1) * 20 : 0;
   ctx.translate(0, crouch);
   const bob = Math.sin(b.walkT) * 4;
   const w = b.w, h = b.h;
