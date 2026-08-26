@@ -2017,15 +2017,42 @@ function spawnBlood(x, y, dir, count, colors){
 }
 
 /* ---------- 좀비 떼 (분노 모드 전용 보너스 먹잇감) ---------- */
+/* 좀비 종류: 스테이지가 오를수록 험한 놈들이 섞여 나온다 */
+const ZOMBIE_KINDS = {
+  walker:  { w: 1,    h: 1,    spd: 1,    score: 1,   min: 1 },
+  runner:  { w: 0.82, h: 0.94, spd: 1.75, score: 1.4, min: 3 },
+  brute:   { w: 1.5,  h: 1.32, spd: 0.62, score: 2.2, min: 6 },
+  crawler: { w: 1.25, h: 0.5,  spd: 1.15, score: 1.3, min: 9 },
+};
+/* 좀비 피부톤 3종 (창백·부패·잿빛) */
+const Z_SKINS = [
+  { hi: '#b6c795', mid: '#8ba06b', lo: '#5d724a' },
+  { hi: '#a8b6a0', mid: '#7d8f78', lo: '#4f5f4c' },
+  { hi: '#c0b39a', mid: '#94886f', lo: '#5f5847' },
+];
+function pickZombieKind(){
+  const pool = [];
+  for (const k of Object.keys(ZOMBIE_KINDS)) {
+    if (G.stage >= ZOMBIE_KINDS[k].min) pool.push(k);
+  }
+  /* 기본 워커가 절반 정도를 차지하도록 가중 */
+  return Math.random() < 0.45 ? 'walker' : pick(pool);
+}
 function spawnZombie(side){
   if (G.zombies.length >= 26) return;
+  const kind = pickZombieKind();
+  const K = ZOMBIE_KINDS[kind];
   G.zombies.push({
     x: G.camX + (side > 0 ? viewW + rand(20, 240) : -rand(20, 240)),
     y: GROUND, vx: 0, vy: 0, rot: 0, vr: 0,
-    speed: rand(130, 250), face: -side,
-    h: rand(52, 68), w: rand(20, 26),
+    kind,
+    speed: rand(130, 250) * K.spd, face: -side,
+    h: rand(52, 68) * K.h, w: rand(20, 26) * K.w,
+    scoreMul: K.score,
     seed: Math.random(),
-    shirt: pick(['#5a4a6e', '#4a5a4e', '#6e4a4a', '#44506a', '#5c5244']),
+    skin: pick(Z_SKINS),
+    hat: Math.random() < 0.28 ? pick(['hard', 'cap', 'bald']) : null,
+    shirt: pick(['#5a4a6e', '#4a5a4e', '#6e4a4a', '#44506a', '#5c5244', '#6a5a3e', '#3f4a5e']),
     state: 'walk', t: rand(0, 6),
     launchT: 0, bounced: false, fleeUntil: 0, dead: false,
   });
@@ -2047,7 +2074,7 @@ function hitZombies(lo, hi, dir){
     z.vr = d * rand(6, 14);
     z.bounced = false;
     n++;
-    const gain = addScore(60);
+    const gain = addScore(Math.round(60 * (z.scoreMul || 1)));
     bumpCombo();
     popup(z.x + rand(-16, 16), GROUND - z.h - 30, '+' + gain, 21, '#c9e6a0');
     spawnBlood(z.x, GROUND - z.h * 0.55, d, 12);
@@ -5824,15 +5851,24 @@ function drawZombie(z){
     ctx.rotate(sway * 0.05);
   }
   const h = z.h, w = z.w;
-  const zSkin = [[0, '#b6c795'], [0.5, '#8ba06b'], [1, '#5d724a']];
-  const zSkinD = [[0, '#8ba06b'], [0.5, '#6b8052'], [1, '#48593a']];
+  const kind = z.kind || 'walker';
+  const SK = z.skin || { hi: '#b6c795', mid: '#8ba06b', lo: '#5d724a' };
+  const zSkin = [[0, SK.hi], [0.5, SK.mid], [1, SK.lo]];
+  const zSkinD = [[0, SK.mid], [0.5, shade(SK.mid, -0.18)], [1, shade(SK.lo, -0.2)]];
+  /* 러너는 앞으로 숙이고, 크롤러는 거의 엎드려 기어온다 */
+  if (!launched) {
+    if (kind === 'runner') ctx.rotate(-0.22);
+    else if (kind === 'crawler') ctx.rotate(-0.62);
+    else if (kind === 'brute') ctx.rotate(0.06);
+  }
   const shirtHi = shade(z.shirt, 0.2), shirtDk = shade(z.shirt, -0.35);
   const pant = shade(z.shirt, -0.5);
   ctx.strokeStyle = 'rgba(20,24,16,.45)';
   ctx.lineJoin = 'round';
   ctx.lineWidth = 1.8;
   const legH2 = h * 0.42, torH = h * 0.46, headR2 = h * 0.15;
-  const legSw = launched ? 0.35 : sway * 0.38;
+  const swMul = kind === 'runner' ? 1.45 : kind === 'brute' ? 0.7 : 1;
+  const legSw = launched ? 0.35 : sway * 0.38 * swMul;
   /* 다리: 그라데이션 캡슐 + 찢어진 바지 */
   for (const sd of [-1, 1]) {
     const px = sd * w * 0.18;
@@ -5920,6 +5956,29 @@ function drawZombie(z){
   ctx.quadraticCurveTo(hx2 - headR2 * 0.3, hy2 - headR2 * 1.05, hx2 + headR2 * 0.6, hy2 - headR2 * 0.55);
   ctx.closePath();
   ctx.fill();
+  /* 모자·헬멧 변주 */
+  if (z.hat === 'hard') {
+    ctx.fillStyle = '#e0b83c';
+    ctx.beginPath();
+    ctx.arc(hx2, hy2 - headR2 * 0.42, headR2 * 0.95, Math.PI * 1.02, Math.PI * 2.02);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c79f28';
+    ctx.fillRect(hx2 - headR2 * 0.2, hy2 - headR2 * 0.5, headR2 * 1.5, headR2 * 0.22);
+  } else if (z.hat === 'cap') {
+    ctx.fillStyle = '#3f4a5e';
+    ctx.beginPath();
+    ctx.arc(hx2, hy2 - headR2 * 0.38, headR2 * 0.88, Math.PI * 1.05, Math.PI * 2.05);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2e3748';
+    ctx.fillRect(hx2 + headR2 * 0.3, hy2 - headR2 * 0.5, headR2 * 1.15, headR2 * 0.2);
+  }
+  /* 브루트: 찢긴 어깨 견장 */
+  if (kind === 'brute') {
+    ctx.fillStyle = shade(z.shirt, -0.45);
+    ctx.beginPath();
+    ctx.roundRect(-w * 0.55, -torH * 0.92, w * 0.5, torH * 0.3, 4);
+    ctx.fill(); ctx.stroke();
+  }
   /* 붉게 발광하는 눈 */
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
