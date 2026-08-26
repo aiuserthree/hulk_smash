@@ -267,6 +267,16 @@
     font-family:"Black Han Sans";font-size:15px;padding:10px 24px;border-radius:26px;cursor:pointer;
     background:rgba(40,45,62,.6);border:1.5px solid rgba(255,255,255,.28);color:rgba(238,242,248,.9);
   }
+  /* 인앱 브라우저(카톡 등)용: 외부 브라우저 열기 버튼 */
+  #rotateExt{
+    display:none;
+    font-family:"Black Han Sans";font-size:17px;padding:13px 28px;border-radius:28px;cursor:pointer;
+    margin-bottom:14px;color:#f2fff0;
+    background:radial-gradient(circle at 32% 26%, rgba(96,206,98,.9), rgba(28,92,36,.95) 74%);
+    border:1.5px solid rgba(190,255,190,.45);
+    box-shadow:0 0 22px rgba(90,235,105,.35);
+  }
+  #rotateOv .rhint{display:none;font-size:12px;color:rgba(238,242,248,.5);margin:-4px 0 20px}
 
   /* ---------- 터치 컨트롤 ---------- */
   #touch{position:absolute;inset:0;pointer-events:none;display:none}
@@ -535,7 +545,9 @@
   <div class="overlay" id="rotateOv">
     <div class="rphone"></div>
     <div class="rmsg">가로 모드로 돌려주세요!</div>
-    <div class="rsub">헐크 스매쉬는 가로 화면에 최적화되어 있습니다</div>
+    <div class="rsub" id="rotateSub">헐크 스매쉬는 가로 화면에 최적화되어 있습니다</div>
+    <button id="rotateExt">🌐 브라우저에서 열기 (가로모드 지원)</button>
+    <div class="rhint" id="rotateHint"></div>
     <button id="rotateSkip">세로로 계속하기</button>
   </div>
 </div>
@@ -1308,6 +1320,37 @@ function checkOrientation(){
 document.getElementById('rotateSkip').addEventListener('pointerdown', e => {
   e.preventDefault(); rotateDismissed = true; rotateOv.classList.remove('on');
 });
+
+/* 인앱 브라우저(카톡·라인 등)는 화면 회전이 잠겨 있어 외부 브라우저로 열도록 안내 */
+function setupInAppGuide(ua){
+  const inKakao = /KAKAOTALK/i.test(ua);
+  const inLine = /\bLine\//i.test(ua);
+  const inFbIg = /FBAN|FBAV|Instagram/i.test(ua);
+  const ext = document.getElementById('rotateExt');
+  const sub = document.getElementById('rotateSub');
+  const hint = document.getElementById('rotateHint');
+  if (inKakao || inLine) {
+    sub.textContent = (inKakao ? '카카오톡' : 'LINE') + ' 안 브라우저에서는 화면이 회전되지 않아요';
+    ext.style.display = 'block';
+    hint.textContent = '버튼이 안 되면 우측 하단 메뉴(⋮)에서 ‘다른 브라우저로 열기’를 눌러주세요';
+    hint.style.display = 'block';
+    ext.onpointerdown = e => {
+      e.preventDefault();
+      if (inKakao) {
+        location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href);
+      } else {
+        const u = new URL(location.href);
+        u.searchParams.set('openExternalBrowser', '1');
+        location.href = u.toString();
+      }
+    };
+  } else if (inFbIg) {
+    sub.textContent = '앱 안 브라우저에서는 화면이 회전되지 않을 수 있어요';
+    hint.textContent = '우측 상단 메뉴(⋯)에서 ‘외부 브라우저로 열기’를 선택하면 가로 모드로 즐길 수 있어요';
+    hint.style.display = 'block';
+  }
+}
+setupInAppGuide(navigator.userAgent);
 addEventListener('resize', checkOrientation);
 addEventListener('orientationchange', () => setTimeout(checkOrientation, 80));
 const orientMq = matchMedia('(orientation: portrait)');
