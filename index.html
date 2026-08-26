@@ -513,7 +513,11 @@
         <span class="kb locked">B</span><span class="locked-row">낙뢰 폭풍 — STAGE 6 해제</span>
         <span class="kb locked">Q·E·F·T·G</span><span class="locked-row">보스 격파 보상 스킬 (계속 누적!)</span>
       </div>
-      <button class="bigbtn" id="startBtn">부수러 가기!</button>
+      <div id="startBtns" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <button class="bigbtn" id="continueBtn" style="display:none">이어하기</button>
+        <button class="bigbtn" id="startBtn">부수러 가기!</button>
+      </div>
+      <div id="saveInfo" style="display:none;margin-top:10px;font-size:12px;font-weight:700;color:#6a6350"></div>
       <div style="margin-top:14px;font-size:12px;font-weight:700;color:#8a8270">P 일시정지 · M 음소거</div>
     </div>
   </div>
@@ -1443,7 +1447,8 @@ function togglePause(){
     BGM.full();
   }
 }
-$('startBtn').addEventListener('click', () => { initAudio(); startGame(); });
+$('startBtn').addEventListener('click', () => { initAudio(); clearProgress(); startGame(); });
+$('continueBtn').addEventListener('click', () => { initAudio(); continueGame(); });
 $('nextBtn').addEventListener('click', () => { initAudio(); nextStage(); });
 $('resumeBtn').addEventListener('click', () => { initAudio(); togglePause(); });
 $('retryBtn').addEventListener('click', () => {
@@ -1455,7 +1460,11 @@ $('retryBtn').addEventListener('click', () => {
   SND.roar();
   popup(H.x, GROUND - 240, 'HULK SMASH!!', 40, '#4cbb4f');
 });
-$('restartBtn').addEventListener('click', () => { ui.pauseOv.classList.remove('on'); startGame(); });
+$('restartBtn').addEventListener('click', () => {
+  ui.pauseOv.classList.remove('on');
+  clearProgress();
+  startGame();
+});
 
 /* ---------- 스테이지 생성 ---------- */
 function stageTypePool(n){
@@ -1583,29 +1592,86 @@ function genStage(n){
   updateSkillLocks();
 }
 
-function startGame(){
-  G.stage = 1; G.score = 0; G.rage = 0;
-  G.upgrades = { punch: 0, slam: 0, clap: 0, dash: 0, rage: 0, hp: 0, size: 0 };
-  G.actives = { quake: 0, throwSteel: 0, roar: 0, spin: 0, stomp: 0 };
+/* ---------- 진행 저장 (스테이지 단위 자동 저장) ---------- */
+const SAVE_KEY = 'hulkSmash.save.v1';
+function saveProgress(){
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      v: 1, stage: G.stage, score: G.score, actives: G.actives, at: G.savedAt || 0,
+    }));
+  } catch (_) { /* 시크릿 모드 등 저장 불가 — 무시하고 계속 플레이 */ }
+}
+function loadProgress(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || s.v !== 1) return null;
+    const stage = Math.floor(s.stage);
+    if (!(stage >= 1 && stage < 10000)) return null;
+    const score = Number(s.score);
+    const actives = { quake: 0, throwSteel: 0, roar: 0, spin: 0, stomp: 0 };
+    for (const k of Object.keys(actives)) {
+      const lv = Math.floor((s.actives || {})[k]);
+      if (lv >= 0 && lv < 100) actives[k] = lv;
+    }
+    return { stage, score: score >= 0 ? score : 0, actives };
+  } catch (_) { return null; }
+}
+function clearProgress(){
+  try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+}
+/* 시작 화면: 저장된 진행이 있으면 이어하기 버튼 노출 */
+function refreshStartScreen(){
+  const s = loadProgress();
+  const btn = $('continueBtn'), info = $('saveInfo'), start = $('startBtn');
+  if (s && s.stage >= 2) {
+    btn.style.display = '';
+    btn.textContent = '이어하기 · STAGE ' + s.stage;
+    info.style.display = '';
+    const owned = Object.values(s.actives).filter(v => v > 0).length;
+    info.textContent = '저장된 진행 — 점수 ' + s.score.toLocaleString()
+      + (owned ? ' · 보상 스킬 ' + owned + '개' : '');
+    start.textContent = '처음부터';
+  } else {
+    btn.style.display = 'none';
+    info.style.display = 'none';
+    start.textContent = '부수러 가기!';
+  }
+}
+function beginStage(n){
   ui.startOv.classList.remove('on');
   ui.clearOv.classList.remove('on');
   ui.hud.classList.add('on');
   ui.touch.classList.add('on');
-  genStage(1);
+  genStage(n);
   G.state = 'play';
+  saveProgress();
   SND.roar();
   BGM.start();
   BGM.full();
+}
+function startGame(){
+  G.stage = 1; G.score = 0; G.rage = 0;
+  G.upgrades = { punch: 0, slam: 0, clap: 0, dash: 0, rage: 0, hp: 0, size: 0 };
+  G.actives = { quake: 0, throwSteel: 0, roar: 0, spin: 0, stomp: 0 };
+  beginStage(1);
   popup(H.x, GROUND - 240, 'HULK SMASH!!', 46, '#4cbb4f');
+}
+/* 저장된 지점부터 이어서 시작 */
+function continueGame(){
+  const s = loadProgress();
+  if (!s) { startGame(); return; }
+  G.stage = s.stage; G.score = s.score; G.rage = 0;
+  G.upgrades = { punch: 0, slam: 0, clap: 0, dash: 0, rage: 0, hp: 0, size: 0 };
+  G.actives = s.actives;
+  beginStage(s.stage);
+  updateUpgradeBadges();
+  popup(H.x, GROUND - 240, 'STAGE ' + s.stage + ' 이어서!', 42, '#4cbb4f');
 }
 function nextStage(){
   G.stage++;
-  ui.clearOv.classList.remove('on');
-  genStage(G.stage);
-  G.state = 'play';
-  SND.roar();
-  BGM.start();
-  BGM.full();
+  beginStage(G.stage);
   popup(H.x + 140, GROUND - 260, G.theme.name, 34, '#ffd23f');
 }
 
@@ -3554,8 +3620,18 @@ function showClear(){
     ui.nextBtn.style.display = 'none';
     ui.upgradeRow.innerHTML = '';
     const notOwned = ACTIVES.filter(a => G.actives[a.key] === 0);
-    const pool = (notOwned.length > 0 ? notOwned : ACTIVES)
-      .slice().sort(() => Math.random() - 0.5).slice(0, 3);
+    const owned = ACTIVES.filter(a => G.actives[a.key] > 0).length;
+    let pool;
+    if (owned === 0) {
+      /* 첫 보스 보상: 토네이도 스핀을 반드시 고를 수 있게 확정 등장 */
+      const spin = ACTIVES.find(a => a.key === 'spin');
+      const rest = notOwned.filter(a => a.key !== 'spin')
+        .sort(() => Math.random() - 0.5).slice(0, 2);
+      pool = [spin, ...rest];
+    } else {
+      pool = (notOwned.length > 0 ? notOwned : ACTIVES)
+        .slice().sort(() => Math.random() - 0.5).slice(0, 3);
+    }
     ui.upgradeHead.textContent = notOwned.length > 0
       ? '⚡ 새 스킬 추가! (기존 스킬은 그대로 유지)'
       : '⚡ 5개 스킬 전부 보유! 레벨업을 골라라!';
@@ -6180,6 +6256,9 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+/* 저장된 진행이 있으면 시작 화면에 이어하기 노출 */
+refreshStartScreen();
 
 /* 폰트 미리 로드 (캔버스 팝업용) */
 if (document.fonts && document.fonts.load) {
