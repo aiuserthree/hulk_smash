@@ -813,6 +813,17 @@ const SND = {
     pTone({type:'sine', f0:f, f1:f*1.01, dur:0.16, vol:0.2});
     pTone({type:'sine', f0:f*1.5, dur:0.12, vol:0.1});
   },
+  powerup(){
+    [660, 880, 1320].forEach((f, i) => pTone({when:i*0.07, type:'square', f0:f, dur:0.12, vol:0.11}));
+    pTone({type:'triangle', f0:330, f1:660, dur:0.25, vol:0.14});
+  },
+  fever(){
+    [523, 659, 784, 1046, 1318].forEach((f, i) => {
+      pTone({when:i*0.09, type:'square', f0:f, dur:0.18, vol:0.13});
+      pTone({when:i*0.09, type:'triangle', f0:f/2, dur:0.2, vol:0.11});
+    });
+    pTone({when:0.45, type:'triangle', f0:1568, dur:0.5, vol:0.1, vib:[6,9]});
+  },
   water(){
     pNoise({dur:0.5, type:'highpass', f0:2800, vol:0.16});
     pNoise({dur:0.35, type:'bandpass', f0:750, vol:0.14});
@@ -1125,6 +1136,12 @@ const G = {
   combo: 0,
   comboT: 0,
   maxCombo: 0,
+  comboPop: 0,          // 콤보 숫자 팝 애니메이션
+  feverT: 0,            // 피버 타임 남은 시간
+  drops: [],            // 파워업 드롭
+  buffAtkT: 0,          // 공격력 2배 버프
+  buffGiantT: 0,        // 거대화 버프
+  buffGiantIn: 0,       // 거대화 램프인 경과 시간
   stageScore: 0,
   stageDestroyed: 0,
   shake: 0,
@@ -1183,13 +1200,18 @@ const H = {
 };
 /* 분노 변신 시 덩치 35% 팽창 + 거인화 강화 */
 function hulkScale(){
+  /* 거대화 버프: 시작·끝 0.35초 부드럽게 커졌다 줄어듦 (연장해도 스냅 없음) */
+  const giant = G.buffGiantT > 0
+    ? 1 + 0.25 * clamp(G.buffGiantT / 0.35, 0, 1) * clamp(G.buffGiantIn / 0.35, 0, 1)
+    : 1;
   return (1 + Math.min(G.stage - 1, 9) * 0.11)
     * (1 + 0.35 * G.rageRamp)
-    * (1 + 0.06 * G.upgrades.size);
+    * (1 + 0.06 * G.upgrades.size)
+    * giant;
 }
 function hulkH(){ return H.baseH * hulkScale(); }
 function hulkW(){ return H.baseW * hulkScale(); }
-function power(){ return 2 + Math.floor((G.stage - 1) * 1.2); }
+function power(){ return (2 + Math.floor((G.stage - 1) * 1.2)) * (G.buffAtkT > 0 ? 2 : 1); }
 function moveSpeed(){ return 330 + Math.min(G.stage, 10) * 12; }
 
 const UNLOCK_STAGE = { punch:1, slam:2, clap:3, dash:4, rage:5 };
@@ -1454,7 +1476,8 @@ function genStage(n){
   G.projs = []; G.hurls = [];
   G.hitStop = 0; G.slowMo = 0; G.camKick = 0; G.zoomKick = 0;
   G.destroyed = 0; G.stageScore = 0; G.stageDestroyed = 0;
-  G.combo = 0; G.comboT = 0; G.maxCombo = 0;
+  G.combo = 0; G.comboT = 0; G.maxCombo = 0; G.comboPop = 0;
+  G.feverT = 0; G.drops = []; G.buffAtkT = 0; G.buffGiantT = 0; G.buffGiantIn = 0;
   G.rageT = 0; G.rageRamp = 0; G.clearT = 0;
 
   const pool = stageTypePool(n);
@@ -1727,6 +1750,7 @@ function hitZombies(lo, hi, dir){
     spawnBlood(z.x, GROUND - z.h * 0.55, d, 12);
     addBurst(z.x, GROUND - z.h * 0.6, 28);
     addSplat(z.x + d * 22);
+    if (Math.random() < 0.06) spawnDrop(z.x);
     spawnDust(z.x, GROUND - z.h * 0.4, 2, 14);
     if (G.rageT > 0) G.rageT = Math.min(G.rageT + 0.12, 10);
   }
@@ -2169,11 +2193,156 @@ function addScore(base){
 }
 function bumpCombo(){
   G.combo++; G.comboT = 2.2;
+  G.comboPop = 0.22;
   if (G.combo > G.maxCombo) G.maxCombo = G.combo;
   if (G.combo >= 5 && G.combo % 5 === 0) SND.comboDing(G.combo);
+  /* 피버 임계 도달 → 피버 타임 */
+  if (G.combo >= feverNeed() && G.feverT <= 0) startFever();
+}
+
+/* 피버 발동 콤보: 스테이지 사물 수의 70% (12~50) — 어느 스테이지든 달성 가능.
+   보스 스테이지(사물 0)는 부술 게 없어 피버가 무의미 + 보스 킬 점수 파밍이 되므로 발동 금지 */
+function feverNeed(){
+  return G.total > 0 ? clamp(Math.round(G.total * 0.7), 12, 50) : Infinity;
+}
+
+/* ---------- 피버 타임: 콤보 50 달성 시 10초간 전부 한 방 + 금빛 축제 ---------- */
+function startFever(){
+  G.feverT = 10;
+  popup(H.x, GROUND - hulkH() - 100, 'FEVER!!', 60, '#ffd23f');
+  G.flash = Math.max(G.flash, 0.14);
+  shake(12); zoomKick(0.05); impact(0.05);
+  SND.fever();
+}
+function endFever(){
+  const bonus = G.combo * 100;
+  G.score += bonus; G.stageScore += bonus;
+  popup(H.x, GROUND - hulkH() - 70, '+' + bonus + ' FEVER BONUS', 32, '#ffd23f');
+  G.combo = 0; G.comboT = 0;
+  updateHUD();
+}
+
+/* ---------- 파워업 드롭: 파괴 시 확률로 떨어지고, 다가가면 자석처럼 흡수 ---------- */
+function spawnDrop(x){
+  if (G.drops.length >= 6) return;
+  let pool = ['atk', 'atk', 'giant', 'giant'];
+  if (hasSkill('rage')) pool = pool.concat(['rage', 'rage']);
+  /* 회복은 HP가 깎일 수 있는 상황(보스전·부상 중)에만 등장 — 일반 스테이지에선 죽은 아이템 */
+  if (G.boss || H.hp < H.maxHp) pool.push('heal', 'heal');
+  G.drops.push({
+    x, y: GROUND - 40, vx: rand(-70, 70), vy: -rand(280, 460),
+    type: pick(pool), t: 0, life: 9, grounded: false, dead: false,
+  });
+}
+function collectDrop(d){
+  if (d.type === 'atk') {
+    G.buffAtkT = 10;
+    popup(H.x, GROUND - hulkH() - 50, 'ATK x2!', 30, '#ffd23f');
+  } else if (d.type === 'rage') {
+    if (G.rageT > 0) {
+      G.rageT = Math.min(G.rageT + 2.5, 12);
+      popup(H.x, GROUND - hulkH() - 50, 'RAGE +2.5s', 30, '#7ce65a');
+    } else {
+      G.rage = clamp(G.rage + 30, 0, 100);
+      popup(H.x, GROUND - hulkH() - 50, 'RAGE +30', 30, '#7ce65a');
+    }
+  } else if (d.type === 'heal') {
+    H.hp = Math.min(H.maxHp, H.hp + 25);
+    updateHpHUD();
+    popup(H.x, GROUND - hulkH() - 50, 'HP +25', 30, '#ff8a7a');
+  } else { /* giant */
+    if (G.buffGiantT <= 0) G.buffGiantIn = 0; /* 새로 시작할 때만 램프인 — 연장 시 스냅 방지 */
+    G.buffGiantT = 10;
+    popup(H.x, GROUND - hulkH() - 50, 'GIANT!', 32, '#c79bff');
+  }
+  addBurst(d.x, d.y - 10, 46);
+  addRing(d.x, GROUND, 60, '#fff8e7', 3);
+  SND.powerup();
+}
+function updateDrops(dt){
+  const hy = GROUND - hulkH() * 0.45;
+  for (const d of G.drops) {
+    d.t += dt;
+    const dx = H.x - d.x, dy = hy - d.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    if (dist < 170 * hulkScale() && G.state === 'play') {
+      /* 자석 흡수 */
+      d.x += dx / dist * 620 * dt;
+      d.y += dy / dist * 620 * dt;
+      if (dist < 48 * hulkScale()) { d.dead = true; collectDrop(d); }
+    } else if (!d.grounded) {
+      d.vy += 1500 * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      if (d.y >= GROUND - 16 && d.vy > 0) { d.y = GROUND - 16; d.grounded = true; }
+    }
+  }
+  G.drops = G.drops.filter(d => !d.dead && d.t < d.life);
+}
+/* 드롭 아이콘: 글로우 배지 + 타입별 심볼 */
+const DROP_COLS = {
+  atk:   ['#ffe27a', '#ffb52e', '#8a5a00'],
+  rage:  ['#b6f79a', '#5ad13e', '#1f5c14'],
+  heal:  ['#ffb0a4', '#ff5a4a', '#7c1408'],
+  giant: ['#e2c6ff', '#a06aff', '#4b2483'],
+};
+function drawDrops(){
+  for (const d of G.drops) {
+    if (d.x < G.camX - 60 || d.x > G.camX + viewW + 60) continue;
+    /* 만료 직전 깜빡임 */
+    if (d.life - d.t < 2.5 && Math.floor(d.t * 9) % 2 === 0) continue;
+    const y = d.y - (d.grounded ? 8 + Math.abs(Math.sin(d.t * 4)) * 10 : 0);
+    const cols = DROP_COLS[d.type];
+    ctx.save();
+    ctx.translate(d.x, y);
+    /* 글로우 */
+    ctx.globalCompositeOperation = 'lighter';
+    const gg = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
+    gg.addColorStop(0, cols[1]);
+    gg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.35 + Math.sin(d.t * 6) * 0.12;
+    ctx.fillStyle = gg;
+    ctx.fillRect(-30, -30, 60, 60);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    /* 배지 */
+    const bg = ctx.createRadialGradient(-5, -6, 2, 0, 0, 16);
+    bg.addColorStop(0, cols[0]);
+    bg.addColorStop(1, cols[1]);
+    ctx.fillStyle = bg;
+    ctx.strokeStyle = cols[2];
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, 15, 0, 7); ctx.fill(); ctx.stroke();
+    /* 심볼 */
+    ctx.fillStyle = '#fff';
+    if (d.type === 'atk') { /* 번개 */
+      ctx.beginPath();
+      ctx.moveTo(2, -9); ctx.lineTo(-5, 1); ctx.lineTo(-1, 1); ctx.lineTo(-3, 9); ctx.lineTo(5, -2); ctx.lineTo(1, -2);
+      ctx.closePath(); ctx.fill();
+    } else if (d.type === 'heal') { /* 십자 */
+      ctx.fillRect(-3, -8, 6, 16);
+      ctx.fillRect(-8, -3, 16, 6);
+    } else if (d.type === 'giant') { /* 별 */
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + i * Math.PI / 5;
+        const r = i % 2 === 0 ? 9.5 : 4.5;
+        ctx[i === 0 ? 'moveTo' : 'lineTo'](Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.closePath(); ctx.fill();
+    } else { /* rage: 불꽃 방울 */
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.quadraticCurveTo(8.5, 0, 0, 9);
+      ctx.quadraticCurveTo(-8.5, 0, 0, -10);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
 }
 function damageObj(o, dmg, hitX, big){
   if (o.hp <= 0) return;
+  if (G.feverT > 0) dmg *= 30; /* 피버: 전부 한 방 */
   o.hp -= dmg;
   o.flash = 0.12;
   o.wobble = 1;
@@ -2211,6 +2380,8 @@ function destroyObj(o, big){
   o.hp = 0;
   G.destroyed++; G.stageDestroyed++;
   bumpCombo();
+  /* 콤보가 높을수록 분노 게이지가 더 빨리 참 (사물 파괴 한정 — 좀비 광역 스윕은 제외) */
+  if (hasSkill('rage') && G.rageT <= 0) G.rage = clamp(G.rage + Math.min(G.combo * 0.2, 3), 0, 100);
   const T = OBJ_TYPES[o.type];
   const gain = addScore(T.score);
   const cx = o.x + o.w / 2, topY = GROUND - o.h;
@@ -2218,7 +2389,9 @@ function destroyObj(o, big){
 
   const isBig = T.big;
   popup(cx + rand(-20, 20), topY - 50, '+' + gain, isBig ? 38 : 27, '#fff8e7');
-  if (G.combo >= 3) popup(H.x, GROUND - hulkH() - 60, 'COMBO x' + G.combo + '!', 28 + Math.min(G.combo * 1.5, 30), '#ff4b33');
+  /* 콤보는 상시 HUD로 표시 — 팝업은 10 단위 마일스톤만 */
+  if (G.combo >= 10 && G.combo % 10 === 0) popup(H.x, GROUND - hulkH() - 60, 'COMBO x' + G.combo + '!!', 30 + Math.min(G.combo, 26), '#ff4b33');
+  if (Math.random() < 0.09) spawnDrop(cx + rand(-24, 24));
 
   addBurst(cx, GROUND - Math.min(o.h * 0.55, 110), isBig ? 110 : 64);
   spawnSparks(cx, GROUND - Math.min(o.h * 0.4, 80), dir, isBig ? 20 : 12);
@@ -2271,6 +2444,8 @@ function destroyObj(o, big){
   updateHUD();
 
   if (G.total > 0 && G.destroyed >= G.total && G.state === 'play' && !G.boss) {
+    /* 피버 도중 클리어: 보너스를 먼저 정산해야 클리어 점수에 포함됨 */
+    if (G.feverT > 0) { G.feverT = 0; endFever(); }
     G.state = 'clearing';
     G.clearT = 1.15;
     SND.roar();
@@ -2651,8 +2826,23 @@ function update(dt){
   G.rageRamp += ((G.rageT > 0 ? 1 : 0) - G.rageRamp) * Math.min(1, dt * 6);
   if (G.rageGrinT > 0) G.rageGrinT = Math.max(0, G.rageGrinT - dt);
 
-  /* 콤보 타이머 */
-  if (G.comboT > 0) { G.comboT -= dt; if (G.comboT <= 0) G.combo = 0; }
+  /* 콤보 타이머 (피버 중엔 콤보가 끊기지 않음) */
+  if (G.feverT > 0) {
+    G.feverT -= dt;
+    /* 금빛 불티가 화면에 흩날림 */
+    if (!reducedMotion && Math.random() < dt * 12 && G.particles.length < 320) G.particles.push({
+      x: G.camX + rand(0, viewW), y: GROUND - rand(60, 380),
+      vx: rand(-40, 40), vy: rand(30, 120),
+      size: rand(2, 4), color: '', rot: 0, vr: 0,
+      t: 0, life: rand(0.5, 1.1), type: 'ember',
+    });
+    if (G.feverT <= 0) endFever();
+  } else if (G.comboT > 0) { G.comboT -= dt; if (G.comboT <= 0) G.combo = 0; }
+  if (G.comboPop > 0) G.comboPop -= dt;
+  /* 파워업 버프 타이머 + 드롭 */
+  if (G.buffAtkT > 0) G.buffAtkT -= dt;
+  if (G.buffGiantT > 0) { G.buffGiantT -= dt; G.buffGiantIn += dt; }
+  updateDrops(dt);
 
   /* 이동 */
   const spd = moveSpeed() * (G.rageT > 0 ? 1.35 : 1);
@@ -3648,6 +3838,9 @@ function render(){
   }
   ctx.globalAlpha = 1;
 
+  /* 파워업 드롭 */
+  drawDrops();
+
   /* 철골 투사체 */
   for (const hu of G.hurls) {
     ctx.save();
@@ -4000,6 +4193,101 @@ function render(){
     ctx.fillStyle = rg;
     ctx.fillRect(0, 0, W, Hpx);
   }
+  /* 피버: 금빛 화면 효과 */
+  if (G.feverT > 0) {
+    const fg = ctx.createRadialGradient(W / 2, Hpx / 2, Hpx * 0.36, W / 2, Hpx / 2, Hpx * 0.75);
+    fg.addColorStop(0, 'rgba(255,205,60,0)');
+    fg.addColorStop(1, 'rgba(255,180,40,' + (0.24 + Math.sin(G.time * 12) * 0.1) + ')');
+    ctx.fillStyle = fg;
+    ctx.fillRect(0, 0, W, Hpx);
+  }
+
+  /* 콤보 HUD (상단 중앙) */
+  if (G.combo >= 2 && (G.state === 'play' || G.state === 'clearing')) {
+    const pop = G.comboPop > 0 ? 1 + G.comboPop * 1.5 : 1;
+    const tier = G.feverT > 0 ? 3 : G.combo >= 30 ? 2 : G.combo >= 10 ? 1 : 0;
+    const tcol = ['#fff8e7', '#ffd23f', '#ff9d33', '#7ce65a'][tier];
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.translate(W / 2, 66);
+    ctx.scale(pop, pop);
+    ctx.font = '400 ' + Math.min(34 + G.combo * 0.5, 56) + 'px "Black Han Sans", sans-serif';
+    ctx.lineWidth = 7;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(22,22,31,.85)';
+    ctx.strokeText('x' + G.combo, 0, 0);
+    ctx.fillStyle = tcol;
+    ctx.fillText('x' + G.combo, 0, 0);
+    ctx.font = '400 13px "Black Han Sans", sans-serif';
+    ctx.lineWidth = 4;
+    ctx.strokeText('COMBO', 0, 18);
+    ctx.fillStyle = 'rgba(255,248,231,.85)';
+    ctx.fillText('COMBO', 0, 18);
+    ctx.restore();
+    /* 콤보 유지 시간 바 */
+    if (G.feverT <= 0) {
+      const bw = 110, frac = clamp(G.comboT / 2.2, 0, 1);
+      ctx.fillStyle = 'rgba(22,22,31,.5)';
+      ctx.fillRect(W / 2 - bw / 2, 92, bw, 5);
+      ctx.fillStyle = tcol;
+      ctx.fillRect(W / 2 - bw / 2, 92, bw * frac, 5);
+      /* 피버 임박 안내 */
+      const left = feverNeed() - G.combo;
+      if (left > 0 && left <= 10) {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = '400 13px "Black Han Sans", sans-serif';
+        ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(22,22,31,.8)';
+        ctx.strokeText('FEVER까지 ' + left, W / 2, 110);
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillText('FEVER까지 ' + left, W / 2, 110);
+        ctx.restore();
+      }
+    }
+  }
+
+  /* 피버 카운트다운 배너 */
+  if (G.feverT > 0 && (G.state === 'play' || G.state === 'clearing')) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    const fpulse = 1 + Math.sin(G.time * 10) * 0.05;
+    ctx.translate(W / 2, 118);
+    ctx.scale(fpulse, fpulse);
+    ctx.font = '400 24px "Black Han Sans", sans-serif';
+    ctx.lineWidth = 6;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(22,22,31,.85)';
+    ctx.strokeText('FEVER ' + Math.ceil(G.feverT), 0, 0);
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText('FEVER ' + Math.ceil(G.feverT), 0, 0);
+    ctx.restore();
+  }
+
+  /* 파워업 버프 남은 시간 */
+  if ((G.buffAtkT > 0 || G.buffGiantT > 0) && (G.state === 'play' || G.state === 'clearing')) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = '400 14px "Black Han Sans", sans-serif';
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(22,22,31,.8)';
+    const parts = [];
+    if (G.buffAtkT > 0) parts.push(['ATK x2 ' + Math.ceil(G.buffAtkT), '#ffd23f']);
+    if (G.buffGiantT > 0) parts.push(['GIANT ' + Math.ceil(G.buffGiantT), '#c79bff']);
+    const by = G.feverT > 0 ? 140 : 128;
+    parts.forEach((p, i) => {
+      /* 보스전(좌측 HP 칩 표시 중)엔 겹치지 않게 중앙 우측에 세로로 쌓음 */
+      const bx = G.boss ? W / 2 + 78 : W / 2 + (i - (parts.length - 1) / 2) * 110;
+      const byy = G.boss ? 114 + i * 20 : by;
+      ctx.strokeText(p[0], bx, byy);
+      ctx.fillStyle = p[1];
+      ctx.fillText(p[0], bx, byy);
+    });
+    ctx.restore();
+  }
+
   /* 화이트 플래시 */
   if (G.flash > 0) {
     ctx.fillStyle = 'rgba(255,248,231,' + (G.flash * 3) + ')';
