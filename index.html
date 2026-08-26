@@ -361,12 +361,22 @@
   #tRage {right:140px;bottom:230px}
   #tThunder{right:78px;bottom:230px}
   .tbtn.locked{opacity:.3;pointer-events:none}
+  /* 스킬 자동 사용 토글 (켜짐 상태) */
+  .tbtn.auto-on{
+    border-color:rgba(140,255,150,.9);color:#f2fff0;
+    background:radial-gradient(circle at 32% 26%, rgba(96,206,98,.82), rgba(28,92,36,.9) 74%);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.3), 0 0 20px rgba(110,245,120,.6);
+  }
+  .skill#sk-auto{cursor:pointer;pointer-events:auto}
+  .skill.auto-on{background:#cfeecd;box-shadow:4px 4px 0 var(--ink), 0 0 18px rgba(76,187,79,.85)}
+  .skill.auto-on .key{background:var(--green-dk);color:#fff}
   .skill.hidden, .tbtn.hidden{display:none}
   #tQuake{right:16px; bottom:230px}
   #tThrow{right:140px;bottom:292px}
   #tRoar {right:78px; bottom:292px}
   #tSpin {right:16px; bottom:292px}
-  #tStomp{right:140px;bottom:354px}
+  #tStomp{right:16px; bottom:354px}
+  #tAuto {right:140px;bottom:354px;font-size:12.5px}
   .tbtn .tcd{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     border-radius:50%;background:rgba(22,22,31,.55);
@@ -413,7 +423,8 @@
     #tThrow{right:calc(108px + max(16px, env(safe-area-inset-right, 0px)));bottom:208px}
     #tRoar {right:calc(54px + max(16px, env(safe-area-inset-right, 0px)));bottom:208px}
     #tSpin {right:max(16px, env(safe-area-inset-right, 0px));bottom:208px}
-    #tStomp{right:calc(108px + max(16px, env(safe-area-inset-right, 0px)));bottom:262px}
+    #tStomp{right:max(16px, env(safe-area-inset-right, 0px));bottom:262px}
+    #tAuto {right:calc(108px + max(16px, env(safe-area-inset-right, 0px)));bottom:262px}
     body.touchmode #muteBtn{top:8px;right:calc(102px + max(16px, env(safe-area-inset-right, 0px)));left:auto;bottom:auto}
     body.touchmode #pauseBtn{top:8px;right:calc(150px + max(16px, env(safe-area-inset-right, 0px)));left:auto;bottom:auto}
     /* 가로: 팝업 패널을 스크롤 없이 한 화면에 압축 */
@@ -475,6 +486,7 @@
       <div class="skill chip hidden" id="sk-roar"><span class="key">F</span><div class="name">포효</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip hidden" id="sk-spin"><span class="key">T</span><div class="name">토네이도</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip hidden" id="sk-stomp"><span class="key">G</span><div class="name">스톰프</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
+      <div class="skill chip hidden" id="sk-auto" title="스킬 자동 사용 (O)"><span class="key">O</span><div class="name">자동</div></div>
     </div>
     <div id="muteBtn" class="chip" title="소리 켜기/끄기 (M)">🔊</div>
     <div id="pauseBtn" class="chip" title="일시정지 (P)">⏸</div>
@@ -494,6 +506,7 @@
     <div class="tbtn tskill hidden" id="tRoar">포효<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill hidden" id="tSpin">회전<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill hidden" id="tStomp">스톰프<span class="tcd"></span><span class="lv"></span></div>
+    <div class="tbtn tskill hidden" id="tAuto">자동</div>
     <div class="tbtn tskill locked" id="tThunder">낙뢰<span class="tcd"></span><span class="lv"></span></div>
   </div>
 
@@ -1156,6 +1169,8 @@ const G = {
   buffAtkT: 0,          // 공격력 2배 버프
   buffGiantT: 0,        // 거대화 버프
   buffGiantIn: 0,       // 거대화 램프인 경과 시간
+  autoSkill: false,     // 스킬 자동 사용 토글
+  autoT: 0,             // 자동 사용 간격 타이머
   stormT: 0,            // 낙뢰 폭풍 지속(하늘 어두워짐)
   boltFlash: 0,         // 낙뢰 착탄 푸른 섬광
   stageScore: 0,
@@ -1265,6 +1280,7 @@ addEventListener('keydown', e => {
     case 'KeyT': pressQueue.push('spin'); break;
     case 'KeyG': pressQueue.push('stomp'); break;
     case 'KeyB': pressQueue.push('thunder'); break;
+    case 'KeyO': pressQueue.push('auto'); break;
     case 'KeyM': toggleMute(); break;
     case 'KeyP': case 'Escape': togglePause(); break;
   }
@@ -1355,6 +1371,8 @@ bindTap('tRoar', 'roar');
 bindTap('tSpin', 'spin');
 bindTap('tStomp', 'stomp');
 bindTap('tThunder', 'thunder');
+bindTap('tAuto', 'auto');
+document.getElementById('sk-auto').addEventListener('click', () => { initAudio(); toggleAuto(); });
 
 /* 모바일 세로 모드: 가로 회전 권장 안내 (플레이 중 세로로 돌리면 자동 일시정지) */
 const rotateOv = document.getElementById('rotateOv');
@@ -1422,13 +1440,13 @@ const ui = {
     punch: $('sk-punch'), slam: $('sk-slam'), clap: $('sk-clap'),
     dash: $('sk-dash'), rage: $('sk-rage'),
     quake: $('sk-quake'), throwSteel: $('sk-throwSteel'), roar: $('sk-roar'),
-    spin: $('sk-spin'), stomp: $('sk-stomp'), thunder: $('sk-thunder'),
+    spin: $('sk-spin'), stomp: $('sk-stomp'), thunder: $('sk-thunder'), auto: $('sk-auto'),
   },
   rageFill: $('rageFill'),
   tskills: {
     slam: $('tSlam'), clap: $('tClap'), dash: $('tDash'), rage: $('tRage'),
     quake: $('tQuake'), throwSteel: $('tThrow'), roar: $('tRoar'),
-    spin: $('tSpin'), stomp: $('tStomp'), thunder: $('tThunder'),
+    spin: $('tSpin'), stomp: $('tStomp'), thunder: $('tThunder'), auto: $('tAuto'),
   },
 };
 
@@ -2880,6 +2898,46 @@ function doQuake(){
   SND.bigBoom(); SND.land();
   popup(H.x, GROUND - hulkH() - 60, 'EARTHQUAKE!!', 40, '#ff8a3c');
 }
+/* ---------- 스킬 자동 사용 (STAGE 5부터) ---------- */
+const AUTO_STAGE = 5;
+function autoAvailable(){ return G.stage >= AUTO_STAGE; }
+function toggleAuto(){
+  if (!autoAvailable()) return;
+  G.autoSkill = !G.autoSkill;
+  G.autoT = 0;
+  refreshAutoBtn();
+  SND.unlock();
+  popup(H.x, GROUND - hulkH() - 60, G.autoSkill ? '스킬 자동 ON' : '스킬 자동 OFF',
+        30, G.autoSkill ? '#7ce65a' : '#ffd23f');
+}
+function refreshAutoBtn(){
+  const on = autoAvailable();
+  ui.skills.auto.classList.toggle('hidden', !on);
+  ui.tskills.auto.classList.toggle('hidden', !on);
+  ui.skills.auto.classList.toggle('auto-on', on && G.autoSkill);
+  ui.tskills.auto.classList.toggle('auto-on', on && G.autoSkill);
+}
+/* 보유한 스킬 중 쿨타임이 돈 것을 하나씩 자동 시전 */
+function autoCast(dt){
+  if (!G.autoSkill || !autoAvailable() || G.state !== 'play') return;
+  G.autoT -= dt;
+  if (G.autoT > 0) return;
+  if (H.slam || H.clapT > 0 || H.dashT > 0 || H.spinT > 0 || H.stompN > 0) { G.autoT = 0.1; return; }
+  const ready = [];
+  if (hasSkill('rage') && G.rage >= 100 && G.rageT <= 0) ready.push('rage');
+  if (hasSkill('slam') && H.slamCd <= 0) ready.push('slam');
+  if (hasSkill('clap') && H.clapCd <= 0) ready.push('clap');
+  if (hasSkill('dash') && H.dashCd <= 0) ready.push('dash');
+  if (hasSkill('thunder') && H.thunderCd <= 0) ready.push('thunder');
+  if (G.actives.quake && H.quakeCd <= 0) ready.push('quake');
+  if (G.actives.throwSteel && H.throwCd <= 0) ready.push('throwSteel');
+  if (G.actives.roar && H.roarCd <= 0) ready.push('roar');
+  if (G.actives.spin && H.spinCd <= 0) ready.push('spin');
+  if (G.actives.stomp && H.stompCd <= 0) ready.push('stomp');
+  if (!ready.length) { G.autoT = 0.2; return; }
+  pressQueue.push(pick(ready));
+  G.autoT = 0.55;
+}
 /* 낙뢰 폭풍 (STAGE 6 해제): 하늘에서 번개가 헐크를 중심으로 화면 전체에 연쇄 낙하 */
 function doThunder(){
   if (!hasSkill('thunder') || H.thunderCd > 0 || H.slam || H.clapT > 0 || H.dashT > 0) return;
@@ -3051,6 +3109,8 @@ function updateHurls(dt){
 function update(dt){
   G.time += dt;
 
+  autoCast(dt);
+
   /* 액션 큐 */
   while (pressQueue.length) {
     const a = pressQueue.shift();
@@ -3067,6 +3127,7 @@ function update(dt){
     else if (a === 'spin') doSpin();
     else if (a === 'stomp') doStomp();
     else if (a === 'thunder') doThunder();
+    else if (a === 'auto') toggleAuto();
   }
   /* Z 꾹 누르면 무자비 연타 */
   if (G.state === 'play' && input.punch) doPunch();
@@ -3686,6 +3747,8 @@ function updateSkillLocks(){
     ui.skills[name].classList.toggle('locked', !on);
     ui.tskills[name].classList.toggle('locked', !on);
   }
+  if (!autoAvailable()) G.autoSkill = false;
+  refreshAutoBtn();
   updateUpgradeBadges();
 }
 /* 보상 액티브 스킬: 보유 시 버튼 표시 + 레벨 배지 */
