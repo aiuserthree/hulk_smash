@@ -164,6 +164,7 @@
     box-shadow:8px 8px 0 var(--ink);
     padding:28px 34px;
     max-width:560px;width:100%;
+    max-height:92vh;overflow-y:auto;
     transform:rotate(-.6deg);
   }
   .burst-title{
@@ -263,18 +264,19 @@
   #tRight{left:96px;  bottom:78px;width:64px;height:64px;font-size:26px}
   #tJump {right:116px;bottom:78px;width:58px;height:58px;font-size:15px}
   #tPunch{right:20px; bottom:70px;width:84px;height:84px;font-size:18px;background:rgba(76,187,79,.9);color:#fff}
-  .tskill{width:48px;height:48px;font-size:12px}
-  #tSlam {right:30px; bottom:172px}
-  #tClap {right:86px; bottom:192px}
-  #tDash {right:142px;bottom:172px}
-  #tRage {right:198px;bottom:192px}
+  /* 스킬: 3×3 바둑판 그리드 (우측 정렬, 균일 간격) */
+  .tskill{width:52px;height:52px;font-size:11.5px}
+  #tSlam {right:140px;bottom:168px}
+  #tClap {right:78px; bottom:168px}
+  #tDash {right:16px; bottom:168px}
+  #tRage {right:140px;bottom:230px}
   .tbtn.locked{opacity:.3;pointer-events:none}
   .skill.hidden, .tbtn.hidden{display:none}
-  #tQuake{right:58px; bottom:242px}
-  #tThrow{right:114px;bottom:260px}
-  #tRoar {right:170px;bottom:242px}
-  #tSpin {right:226px;bottom:260px}
-  #tStomp{right:282px;bottom:242px}
+  #tQuake{right:78px; bottom:230px}
+  #tThrow{right:16px; bottom:230px}
+  #tRoar {right:140px;bottom:292px}
+  #tSpin {right:78px; bottom:292px}
+  #tStomp{right:16px; bottom:292px}
   .tbtn .tcd{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     border-radius:50%;background:rgba(22,22,31,.55);
@@ -284,6 +286,41 @@
   body.touchmode #skills{display:none}
   body.touchmode #muteBtn{left:auto;bottom:auto;top:88px;right:14px}
   body.touchmode #pauseBtn{left:auto;bottom:auto;top:88px;right:62px}
+
+  /* 모바일 가로 모드: 낮은 화면 높이용 컴팩트 레이아웃 */
+  @media (max-height: 500px){
+    #stageBadge{top:8px;left:8px;font-size:16px;gap:6px}
+    #stageBadge .num{font-size:20px}
+    #progressWrap{top:46px;left:8px;width:min(210px,26vw);padding:4px 8px}
+    #progressLabel{font-size:11px}
+    #hpWrap{top:88px;left:8px;width:min(180px,24vw);padding:4px 8px}
+    #scoreBox{top:8px;right:8px;font-size:18px;padding:4px 10px}
+    #skills{right:8px;bottom:8px}
+    .skill{width:52px;padding:4px 3px}
+    .skill .name{font-size:9.5px}
+    .skill .key{font-size:12px;padding:2px 5px}
+    #muteBtn{left:8px;bottom:8px}
+    #pauseBtn{left:58px;bottom:8px}
+    .panel{padding:16px 22px}
+    .burst-title{font-size:clamp(28px,6vh,44px)}
+    #tLeft {left:12px; bottom:16px;width:56px;height:56px}
+    #tRight{left:80px; bottom:16px;width:56px;height:56px}
+    #tJump {right:100px;bottom:18px;width:52px;height:52px;font-size:13px}
+    #tPunch{right:16px;bottom:12px;width:74px;height:74px;font-size:16px}
+    .tskill{width:46px;height:46px;font-size:10.5px}
+    /* 가로: 그리드를 우측 가장자리(주먹 위)에 3×3로 */
+    #tSlam {right:124px;bottom:100px}
+    #tClap {right:70px; bottom:100px}
+    #tDash {right:16px; bottom:100px}
+    #tRage {right:124px;bottom:154px}
+    #tQuake{right:70px; bottom:154px}
+    #tThrow{right:16px; bottom:154px}
+    #tRoar {right:124px;bottom:208px}
+    #tSpin {right:70px; bottom:208px}
+    #tStomp{right:16px; bottom:208px}
+    body.touchmode #muteBtn{top:8px;right:118px;left:auto;bottom:auto}
+    body.touchmode #pauseBtn{top:8px;right:166px;left:auto;bottom:auto}
+  }
 
   @media (prefers-reduced-motion:reduce){
     .skill.rage-ready,#unlockCard{animation:none}
@@ -4388,7 +4425,7 @@ function drawTankBody(b){
   ctx.fillRect(-w * 0.15, hy - h * 0.42 - 66, 3, 14);
 }
 
-/* ---------- 좀비 그리기 ---------- */
+/* ---------- 좀비 그리기 (레퍼런스 스타일 셰이딩) ---------- */
 function drawZombie(z){
   const launched = z.state === 'launched';
   const sway = Math.sin(z.t * 9 + z.seed * 6);
@@ -4398,59 +4435,131 @@ function drawZombie(z){
     ctx.rotate(z.rot);
     ctx.globalAlpha = clamp(1.6 - (z.t - z.launchT) * 1.45, 0, 1);
   } else {
-    /* 그림자 */
-    ctx.fillStyle = 'rgba(15,15,25,.2)';
+    ctx.fillStyle = 'rgba(15,15,25,.22)';
     ctx.beginPath();
-    ctx.ellipse(0, 2, z.w * 0.8, 4, 0, 0, 7);
+    ctx.ellipse(0, 2, z.w * 0.9, 4, 0, 0, 7);
     ctx.fill();
     ctx.scale(z.face, 1);
-    ctx.rotate(sway * 0.06);
+    ctx.rotate(sway * 0.05);
   }
   const h = z.h, w = z.w;
-  const zskin = '#a8b88a';
-  const legH2 = h * 0.42, torH = h * 0.42, headR2 = h * 0.16;
-  ctx.strokeStyle = 'rgba(15,18,28,.45)';
-  ctx.lineWidth = 1.6;
-  /* 다리 (비틀비틀) */
-  ctx.fillStyle = '#2e2e38';
-  const legSw = launched ? 0.4 : sway * 0.38;
-  ctx.save();
-  ctx.translate(-w * 0.16, -legH2);
-  ctx.rotate(legSw);
-  ctx.fillRect(-3, 0, 6.5, legH2);
-  ctx.restore();
-  ctx.save();
-  ctx.translate(w * 0.16, -legH2);
-  ctx.rotate(-legSw);
-  ctx.fillRect(-3, 0, 6.5, legH2);
-  ctx.restore();
-  /* 상체 (앞으로 기움) */
+  const zSkin = [[0, '#b6c795'], [0.5, '#8ba06b'], [1, '#5d724a']];
+  const zSkinD = [[0, '#8ba06b'], [0.5, '#6b8052'], [1, '#48593a']];
+  const shirtHi = shade(z.shirt, 0.2), shirtDk = shade(z.shirt, -0.35);
+  const pant = shade(z.shirt, -0.5);
+  ctx.strokeStyle = 'rgba(20,24,16,.45)';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 1.8;
+  const legH2 = h * 0.42, torH = h * 0.46, headR2 = h * 0.15;
+  const legSw = launched ? 0.35 : sway * 0.38;
+  /* 다리: 그라데이션 캡슐 + 찢어진 바지 */
+  for (const sd of [-1, 1]) {
+    const px = sd * w * 0.18;
+    const ax = px + Math.sin(legSw * sd) * legH2 * 0.55;
+    limbG(px, -legH2, ax, -2, w * 0.16, w * 0.11, sd < 0 ? zSkinD : zSkin);
+    /* 바지 (허벅지 절반, 밑단 너덜) */
+    const kx2 = lerp2(px, ax, 0.55), ky2 = lerp2(-legH2, -2, 0.55);
+    limbG(px, -legH2, kx2, ky2, w * 0.18, w * 0.14, [[0, shade(pant, 0.15)], [1, pant]]);
+    /* 발 */
+    ctx.fillStyle = sd < 0 ? '#48593a' : '#5d724a';
+    ctx.beginPath();
+    ctx.roundRect(ax - w * 0.1, -5, w * 0.3, 5.5, 2.5);
+    ctx.fill();
+  }
+  /* 상체 (굽은 등) */
   ctx.save();
   ctx.translate(0, -legH2);
-  ctx.rotate(launched ? 0.3 : 0.16 + sway * 0.05);
-  ctx.fillStyle = z.shirt;
-  ctx.fillRect(-w / 2, -torH, w, torH);
-  ctx.strokeRect(-w / 2, -torH, w, torH);
-  /* 앞으로 뻗은 두 팔 */
-  ctx.fillStyle = zskin;
-  const armY = -torH * 0.78 + sway * 1.6;
-  ctx.fillRect(w * 0.2, armY, w * 1.15, 4.5);
-  ctx.fillRect(w * 0.2, armY + 8, w * 0.95, 4.5);
-  /* 머리 */
+  ctx.rotate(launched ? 0.35 : 0.2 + sway * 0.05);
+  /* 뒷팔 */
+  limbG(-w * 0.05, -torH * 0.72, w * 0.95, -torH * 0.72 + sway * 2.5 + 5, w * 0.12, w * 0.08, zSkinD);
+  /* 몸통: 셔츠 그라데이션 + 너덜 밑단 */
+  const tg2 = ctx.createLinearGradient(-w * 0.5, -torH, w * 0.5, 0);
+  tg2.addColorStop(0, shirtDk);
+  tg2.addColorStop(0.55, z.shirt);
+  tg2.addColorStop(1, shirtHi);
+  ctx.fillStyle = tg2;
   ctx.beginPath();
-  ctx.arc(w * 0.14, -torH - headR2 * 0.72, headR2, 0, 7);
+  ctx.moveTo(-w * 0.5, 4);
+  ctx.quadraticCurveTo(-w * 0.62, -torH * 0.62, -w * 0.28, -torH * 0.94);
+  ctx.quadraticCurveTo(w * 0.1, -torH * 1.12, w * 0.42, -torH * 0.8);
+  ctx.quadraticCurveTo(w * 0.58, -torH * 0.45, w * 0.46, 2);
+  /* 너덜너덜한 밑단 */
+  ctx.lineTo(w * 0.28, 9);
+  ctx.lineTo(w * 0.12, 2);
+  ctx.lineTo(-w * 0.06, 10);
+  ctx.lineTo(-w * 0.24, 3);
+  ctx.lineTo(-w * 0.38, 8);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  /* 찢어진 셔츠 사이 피부 */
+  ctx.fillStyle = '#8ba06b';
+  ctx.beginPath();
+  ctx.moveTo(w * 0.05, -torH * 0.5);
+  ctx.lineTo(w * 0.2, -torH * 0.42);
+  ctx.lineTo(w * 0.1, -torH * 0.28);
+  ctx.closePath();
   ctx.fill();
-  ctx.stroke();
+  /* 앞팔: 앞으로 뻗은 캡슐 + 갈퀴 손 */
+  limbG(w * 0.16, -torH * 0.68, w * 1.12, -torH * 0.68 + sway * 3 - 3, w * 0.14, w * 0.1, zSkin);
+  ctx.fillStyle = '#9fb47e';
+  ctx.beginPath();
+  ctx.roundRect(w * 1.06, -torH * 0.68 + sway * 3 - 10, w * 0.2, 12, 3);
+  ctx.fill(); ctx.stroke();
+  /* 손가락 갈퀴 */
+  ctx.save();
+  ctx.strokeStyle = 'rgba(20,24,16,.5)';
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(w * 1.1 + i * 4, -torH * 0.68 + sway * 3 - 8);
+    ctx.lineTo(w * 1.1 + i * 4, -torH * 0.68 + sway * 3 + 1);
+    ctx.stroke();
+  }
+  ctx.restore();
+  /* 머리 */
+  const hx2 = w * 0.2, hy2 = -torH * 0.94 - headR2 * 0.55;
+  const hg2 = ctx.createLinearGradient(hx2 - headR2, hy2 - headR2, hx2 + headR2, hy2 + headR2);
+  hg2.addColorStop(0, '#8ba06b');
+  hg2.addColorStop(1, '#5d724a');
+  ctx.fillStyle = hg2;
+  ctx.beginPath();
+  ctx.arc(hx2, hy2, headR2, Math.PI * 0.9, Math.PI * 2.05);
+  ctx.lineTo(hx2 + headR2 * 0.9, hy2 + headR2 * 0.5);
+  ctx.quadraticCurveTo(hx2 + headR2 * 0.7, hy2 + headR2 * 1.05, hx2 + headR2 * 0.1, hy2 + headR2 * 1.0);
+  ctx.quadraticCurveTo(hx2 - headR2 * 0.6, hy2 + headR2 * 0.95, hx2 - headR2 * 0.75, hy2 + headR2 * 0.4);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
   /* 헝클어진 머리칼 */
   ctx.fillStyle = '#3a3630';
   ctx.beginPath();
-  ctx.arc(w * 0.06, -torH - headR2 * 1.05, headR2 * 0.72, Math.PI * 0.9, Math.PI * 2.05);
+  ctx.moveTo(hx2 + headR2 * 0.6, hy2 - headR2 * 0.55);
+  ctx.lineTo(hx2 + headR2 * 0.2, hy2 - headR2 * 0.35);
+  ctx.lineTo(hx2 + headR2 * 0.05, hy2 - headR2 * 0.75);
+  ctx.quadraticCurveTo(hx2 - headR2 * 0.9, hy2 - headR2 * 0.9, hx2 - headR2 * 0.95, hy2 - headR2 * 0.05);
+  ctx.quadraticCurveTo(hx2 - headR2 * 0.3, hy2 - headR2 * 1.05, hx2 + headR2 * 0.6, hy2 - headR2 * 0.55);
+  ctx.closePath();
   ctx.fill();
-  /* 붉은 눈 */
-  ctx.fillStyle = '#d94436';
+  /* 붉게 발광하는 눈 */
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const zeg = ctx.createRadialGradient(hx2 + headR2 * 0.45, hy2 - headR2 * 0.05, 0.5,
+                                       hx2 + headR2 * 0.45, hy2 - headR2 * 0.05, headR2 * 0.55);
+  zeg.addColorStop(0, 'rgba(255,90,60,.9)');
+  zeg.addColorStop(1, 'rgba(255,60,40,0)');
+  ctx.fillStyle = zeg;
+  ctx.fillRect(hx2 - headR2 * 0.2, hy2 - headR2 * 0.65, headR2 * 1.3, headR2 * 1.2);
+  ctx.restore();
+  ctx.fillStyle = '#ff5240';
   ctx.beginPath();
-  ctx.arc(w * 0.14 + headR2 * 0.5, -torH - headR2 * 0.72, headR2 * 0.18, 0, 7);
+  ctx.ellipse(hx2 + headR2 * 0.45, hy2 - headR2 * 0.05, headR2 * 0.16, headR2 * 0.11, 0.1, 0, 7);
   ctx.fill();
+  /* 벌어진 입 */
+  ctx.fillStyle = '#241610';
+  ctx.beginPath();
+  ctx.roundRect(hx2 + headR2 * 0.18, hy2 + headR2 * 0.4, headR2 * 0.55, headR2 * 0.32, headR2 * 0.1);
+  ctx.fill();
+  ctx.fillStyle = '#d8d2c0';
+  ctx.fillRect(hx2 + headR2 * 0.22, hy2 + headR2 * 0.42, headR2 * 0.45, headR2 * 0.08);
   ctx.restore();
   ctx.restore();
 }
