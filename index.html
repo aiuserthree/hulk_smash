@@ -1148,6 +1148,8 @@ const G = {
   buffAtkT: 0,          // 공격력 2배 버프
   buffGiantT: 0,        // 거대화 버프
   buffGiantIn: 0,       // 거대화 램프인 경과 시간
+  stormT: 0,            // 낙뢰 폭풍 지속(하늘 어두워짐)
+  boltFlash: 0,         // 낙뢰 착탄 푸른 섬광
   stageScore: 0,
   stageDestroyed: 0,
   shake: 0,
@@ -1487,6 +1489,7 @@ function genStage(n){
   G.destroyed = 0; G.stageScore = 0; G.stageDestroyed = 0;
   G.combo = 0; G.comboT = 0; G.maxCombo = 0; G.comboPop = 0;
   G.feverT = 0; G.drops = []; G.buffAtkT = 0; G.buffGiantT = 0; G.buffGiantIn = 0;
+  G.stormT = 0; G.boltFlash = 0;
   G.rageT = 0; G.rageRamp = 0; G.clearT = 0;
 
   const pool = stageTypePool(n);
@@ -1664,19 +1667,21 @@ function addBurst(x, y, size){
   if (G.bursts.length > 12) G.bursts.shift();
 }
 /* 불꽃 스파크 */
-function spawnSparks(x, y, dir, count){
+function spawnSparks(x, y, dir, count, cols){
   const n = Math.min(count, 340 - G.particles.length);
+  const palette = cols || ['#ffd23f', '#fff8e7', '#ff9d33'];
   for (let i = 0; i < n; i++) {
     const a = rand(-0.95, 0.95);
     const sp = rand(300, 800);
     G.particles.push({
       x, y,
       vx: Math.cos(a) * sp * dir, vy: Math.sin(a) * sp - 160,
-      size: rand(2, 4), color: pick(['#ffd23f', '#fff8e7', '#ff9d33']),
+      size: rand(2, 4), color: pick(palette),
       rot: 0, vr: 0, t: 0, life: rand(0.15, 0.32), type: 'spark',
     });
   }
 }
+const BOLT_COLS = ['#bfe4ff', '#ffffff', '#8ab6ff', '#dff1ff'];
 /* 화염구 + 불씨 */
 function fireball(x, y, big){
   const nf = Math.min(big ? 7 : 5, 340 - G.particles.length);
@@ -2132,28 +2137,61 @@ function updateProjs(dt){
 }
 
 /* 낙뢰 (하늘에서 번개 내리꽂기) */
-function spawnBolt(x, mult){
-  const top = GROUND - 640;
+/* 지그재그 낙뢰 경로 생성 (중간에서 갈라지는 가지 포함) */
+function boltPath(x0, y0, x1, y1, jitter, n){
   const segs = [];
-  const n = 8;
   for (let i = 0; i <= n; i++) {
-    const yy = top + (GROUND - top) * (i / n);
-    const xx = (i === 0 || i === n) ? x : x + rand(-44, 44);
-    segs.push([xx, yy]);
+    const f = i / n;
+    const yy = y0 + (y1 - y0) * f;
+    /* 위·아래 끝은 고정, 중간일수록 크게 흔들림 */
+    const sway = (i === 0 || i === n) ? 0 : jitter * (0.45 + Math.sin(f * Math.PI) * 0.75);
+    segs.push([x0 + (x1 - x0) * f + rand(-sway, sway), yy]);
   }
-  G.bolts.push({ segs, t: 0, life: 0.22 });
+  return segs;
+}
+function spawnBolt(x, mult){
+  const top = GROUND - 660;
+  const segs = boltPath(x + rand(-90, 90), top, x, GROUND, 46, 11);
+  /* 몸통 중간에서 뻗어나가는 가지 번개 3~5줄 */
+  const branches = [];
+  const nb = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < nb; i++) {
+    const si = 2 + Math.floor(Math.random() * (segs.length - 5));
+    const [bx, by] = segs[si];
+    const len = rand(90, 210);
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    branches.push(boltPath(bx, by, bx + dir * len * rand(0.5, 1), by + len * rand(0.5, 1.1), 22, 5));
+  }
+  G.bolts.push({ segs, branches, t: 0, life: 0.42, seed: rand(0, 6.3) });
+
   const dmg = Math.ceil(power() * 2 * (mult || 1)) * (G.rageT > 0 ? 2 : 1);
   for (const o of objectsInRange(x - 75, x + 75)) {
     damageObj(o, dmg, clamp(x, o.x, o.x + o.w), true);
   }
   hitZombies(x - 75, x + 75, 0);
   hitBoss(x - 75, x + 75, dmg);
-  addBurst(x, GROUND - 30, 72);
-  spawnSparks(x, GROUND - 18, 1, 6);
-  spawnSparks(x, GROUND - 18, -1, 6);
-  G.flash = Math.max(G.flash, 0.08);
-  shake(10);
-  impact(0.03);
+
+  /* 착탄: 감전 링 + 균열 + 그을음 + 푸른 스파크 분수 */
+  addBurst(x, GROUND - 30, 96);
+  addRing(x, GROUND, 96, '#bfe4ff', 4);
+  addCrack(x, 120);
+  if (Math.random() < 0.6) addScorch(x, rand(40, 76));
+  spawnSparks(x, GROUND - 18, 1, 10, BOLT_COLS);
+  spawnSparks(x, GROUND - 18, -1, 10, BOLT_COLS);
+  spawnDust(x, GROUND, 5, 46);
+  /* 지면을 타고 기어가는 잔류 전류 */
+  const na = Math.min(7, 340 - G.particles.length);
+  for (let i = 0; i < na; i++) G.particles.push({
+    x: x + rand(-26, 26), y: GROUND - rand(2, 16),
+    vx: rand(-330, 330), vy: -rand(30, 150),
+    size: rand(2, 3.4), color: pick(BOLT_COLS),
+    rot: 0, vr: 0, t: 0, life: rand(0.3, 0.6), type: 'spark',
+  });
+  G.flash = Math.max(G.flash, 0.05);
+  G.boltFlash = Math.max(G.boltFlash, 0.16);
+  shake(13);
+  impact(0.04);
+  zoomKick(0.02);
   SND.thunder();
 }
 /* 파괴 흔적 */
@@ -2683,12 +2721,15 @@ function doThunder(){
   /* 헐크에서 가까운 곳부터 바깥으로 퍼져나가게 */
   xs.sort((a, b) => Math.abs(a - H.x) - Math.abs(b - H.x));
   xs.forEach((x, i) => G.pendingBolts.push({ x, delay: 0.1 + i * 0.07, mult }));
-  /* 소환 순간: 상승 스파크 + 예비 섬광 */
-  spawnSparks(H.x, GROUND - hulkH() * 0.9, 1, 8);
-  spawnSparks(H.x, GROUND - hulkH() * 0.9, -1, 8);
-  addRing(H.x, GROUND, 200, '#9ec8ff', 5);
+  /* 소환 순간: 하늘이 어두워지고 헐크에게 전류가 모여듦 */
+  G.stormT = Math.max(G.stormT, 0.1 + n * 0.07 + 1.0);
+  spawnSparks(H.x, GROUND - hulkH() * 0.9, 1, 12, BOLT_COLS);
+  spawnSparks(H.x, GROUND - hulkH() * 0.9, -1, 12, BOLT_COLS);
+  addRing(H.x, GROUND, 240, '#9ec8ff', 6);
+  addRing(H.x, GROUND, 130, '#ffffff', 4);
   G.flash = Math.max(G.flash, 0.12);
   shake(9);
+  zoomKick(0.03);
   SND.whoosh(); SND.roar();
   popup(H.x, GROUND - hulkH() - 70, 'THUNDER STORM!!', 40, '#9ec8ff');
 }
@@ -2881,6 +2922,8 @@ function update(dt){
   /* 파워업 버프 타이머 + 드롭 */
   if (G.buffAtkT > 0) G.buffAtkT -= dt;
   if (G.buffGiantT > 0) { G.buffGiantT -= dt; G.buffGiantIn += dt; }
+  if (G.stormT > 0) G.stormT = Math.max(0, G.stormT - dt);
+  if (G.boltFlash > 0) G.boltFlash = Math.max(0, G.boltFlash - dt * 3.2);
   updateDrops(dt);
 
   /* 이동 */
@@ -3948,26 +3991,44 @@ function render(){
 
   /* 낙뢰 */
   for (const bo of G.bolts) {
-    const a = 1 - bo.t / bo.life;
+    const f = bo.t / bo.life;
+    const fade = 1 - f;
+    /* 재점멸: 사그라들다 두 번 되살아나는 번개 특유의 깜빡임 */
+    const flick = Math.max(0, 0.45 + 0.55 * Math.sin(bo.t * 46 + (bo.seed || 0)));
+    const a = fade * (f < 0.12 ? 1 : 0.35 + 0.65 * flick);
+    const trace = (path, wMul) => {
+      ctx.beginPath();
+      for (let i = 0; i < path.length; i++) {
+        const pt = path[i];
+        if (i === 0) ctx.moveTo(pt[0], pt[1]); else ctx.lineTo(pt[0], pt[1]);
+      }
+      ctx.lineWidth = wMul;
+      ctx.stroke();
+    };
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = a;
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(150,200,255,.9)';
-    ctx.lineWidth = 8;
-    ctx.beginPath();
-    for (let i = 0; i < bo.segs.length; i++) {
-      const pt = bo.segs[i];
-      if (i === 0) ctx.moveTo(pt[0], pt[1]); else ctx.lineTo(pt[0], pt[1]);
+    ctx.lineCap = 'round';
+    /* 3중 발광: 넓은 푸른 헤일로 → 중간 하늘색 → 흰 코어 */
+    const passes = [
+      ['rgba(70,130,255,.30)', 26, 0.85],
+      ['rgba(150,205,255,.75)', 11, 1],
+      ['rgba(255,255,255,1)', 3.6, 1],
+    ];
+    for (const [col, w, am] of passes) {
+      ctx.globalAlpha = a * am;
+      ctx.strokeStyle = col;
+      trace(bo.segs, w);
+      if (bo.branches) for (const br of bo.branches) trace(br, w * 0.5);
     }
-    ctx.stroke();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-    /* 지면 섬광 */
+    /* 착탄 지점 블룸 + 하늘 쪽 발광 */
     const gx = bo.segs[bo.segs.length - 1][0];
-    const gr = 70 * a + 20;
+    ctx.globalAlpha = a;
+    const gr = 88 * fade + 22;
     ctx.drawImage(PUFF_LIGHT, gx - gr, GROUND - gr * 1.4, gr * 2, gr * 2);
+    const sr = 90 * fade + 20;
+    ctx.globalAlpha = a * 0.7;
+    ctx.drawImage(PUFF_LIGHT, bo.segs[0][0] - sr, bo.segs[0][1] - sr, sr * 2, sr * 2);
     ctx.restore();
   }
 
@@ -4326,6 +4387,26 @@ function render(){
       ctx.fillText(p[0], bx, byy);
     });
     ctx.restore();
+  }
+
+  /* 낙뢰 폭풍: 하늘이 어두워지고 화면 위쪽이 번쩍임 */
+  if (G.stormT > 0) {
+    const si = Math.min(1, G.stormT / 0.6);
+    const sg = ctx.createLinearGradient(0, 0, 0, Hpx);
+    sg.addColorStop(0, 'rgba(14,20,46,' + (0.42 * si) + ')');
+    sg.addColorStop(0.55, 'rgba(20,28,58,' + (0.16 * si) + ')');
+    sg.addColorStop(1, 'rgba(20,28,58,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, 0, W, Hpx);
+  }
+  if (G.boltFlash > 0) {
+    const bf = Math.min(1, G.boltFlash);
+    const bg2 = ctx.createLinearGradient(0, 0, 0, Hpx);
+    bg2.addColorStop(0, 'rgba(190,225,255,' + (0.3 * bf) + ')');
+    bg2.addColorStop(0.6, 'rgba(150,195,255,' + (0.07 * bf) + ')');
+    bg2.addColorStop(1, 'rgba(150,195,255,0)');
+    ctx.fillStyle = bg2;
+    ctx.fillRect(0, 0, W, Hpx);
   }
 
   /* 화이트 플래시 */
