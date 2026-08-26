@@ -2184,8 +2184,9 @@ function addScore(base){
   G.score += gain; G.stageScore += gain;
   return gain;
 }
+const COMBO_WINDOW = 3.5;   // 콤보가 끊기기까지의 여유 시간(초)
 function bumpCombo(){
-  G.combo++; G.comboT = 2.2;
+  G.combo++; G.comboT = COMBO_WINDOW;
   G.comboPop = 0.22;
   if (G.combo > G.maxCombo) G.maxCombo = G.combo;
   if (G.combo >= 5 && G.combo % 5 === 0) SND.comboDing(G.combo);
@@ -4219,7 +4220,7 @@ function render(){
     ctx.restore();
     /* 콤보 유지 시간 바 */
     if (G.feverT <= 0) {
-      const bw = 110, frac = clamp(G.comboT / 2.2, 0, 1);
+      const bw = 110, frac = clamp(G.comboT / COMBO_WINDOW, 0, 1);
       ctx.fillStyle = 'rgba(22,22,31,.5)';
       ctx.fillRect(W / 2 - bw / 2, 92, bw, 5);
       ctx.fillStyle = tcol;
