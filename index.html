@@ -328,6 +328,30 @@
     #tStomp{right:16px; bottom:208px}
     body.touchmode #muteBtn{top:8px;right:118px;left:auto;bottom:auto}
     body.touchmode #pauseBtn{top:8px;right:166px;left:auto;bottom:auto}
+    /* 가로: 팝업 패널을 스크롤 없이 한 화면에 압축 */
+    .panel{padding:10px 20px;max-width:min(560px,92vw)}
+    .burst-title{font-size:24px;text-shadow:3px 3px 0 var(--ink);-webkit-text-stroke:1.5px var(--ink);margin-bottom:2px}
+    .sub{font-size:11px;margin-bottom:8px}
+    .bigbtn{font-size:16px;padding:7px 20px;border-width:3px}
+    .ctrl-grid{gap:3px 10px;font-size:11px;margin-bottom:10px}
+    .kb{font-size:10px;padding:1px 5px}
+    #clearStats{gap:6px;margin-bottom:8px}
+    .stat{padding:4px 8px;min-width:68px}
+    .stat b{font-size:16px}
+    .stat span{font-size:9px}
+    #growthMsg{font-size:11px;margin-bottom:2px}
+    #unlockCard{padding:4px 12px;margin-bottom:8px}
+    #unlockCard .t{font-size:9px}
+    #unlockCard .n{font-size:16px}
+    #upgradeHead{font-size:14px;margin-bottom:6px}
+    #upgradeRow{gap:6px;margin-bottom:8px}
+    .upCard{width:104px;padding:6px 8px}
+    .upCard b{font-size:13px;margin-bottom:2px}
+    .upCard span{font-size:9.5px}
+    .upCard .cardLv{font-size:14px;margin-top:3px}
+    .upCard .cardLv em{font-size:11px}
+    .upCard .cardNew{font-size:9.5px;margin-top:3px;padding:2px 4px}
+    .upCard .cardFx{font-size:8.5px}
   }
 
   @media (prefers-reduced-motion:reduce){
@@ -1511,7 +1535,9 @@ function hitZombies(lo, hi, dir){
     const gain = addScore(60);
     bumpCombo();
     popup(z.x + rand(-16, 16), GROUND - z.h - 30, '+' + gain, 21, '#c9e6a0');
-    spawnBlood(z.x, GROUND - z.h * 0.55, d, 11);
+    spawnBlood(z.x, GROUND - z.h * 0.55, d, 12);
+    addBurst(z.x, GROUND - z.h * 0.6, 28);
+    addSplat(z.x + d * 22);
     spawnDust(z.x, GROUND - z.h * 0.4, 2, 14);
     if (G.rageT > 0) G.rageT = Math.min(G.rageT + 0.12, 10);
   }
@@ -1895,6 +1921,15 @@ function spawnBolt(x){
 /* 파괴 흔적 */
 function addScorch(x, w){
   G.remains.push({ kind: 'scorch', x, w });
+}
+/* 좀비 핏자국 (최대 30개 유지) */
+function addSplat(x){
+  const splats = G.remains.filter(r => r.kind === 'splat');
+  if (splats.length >= 30) {
+    const idx = G.remains.indexOf(splats[0]);
+    if (idx >= 0) G.remains.splice(idx, 1);
+  }
+  G.remains.push({ kind: 'splat', x, w: rand(26, 46) });
 }
 function addRubble(x, w){
   const blocks = [];
@@ -2593,9 +2628,21 @@ function update(dt){
       z.x += z.vx * dt;
       z.y += z.vy * dt;
       z.rot += z.vr * dt;
+      /* 날아가며 핏방울 뚝뚝 */
+      if (!reducedMotion && Math.random() < 0.3 && G.particles.length < 330) {
+        G.particles.push({
+          x: z.x + rand(-8, 8), y: z.y - z.h * 0.4,
+          vx: rand(-40, 40), vy: rand(-40, 80),
+          size: rand(2, 4), color: pick(['#a8232a', '#8a1c22', '#c22e30']),
+          rot: 0, vr: 0, t: 0, life: rand(0.8, 1.4),
+          type: 'blood', grounded: false,
+        });
+      }
       if (z.y > GROUND && z.vy > 0 && !z.bounced) {
         z.y = GROUND; z.vy *= -0.4; z.vx *= 0.7; z.bounced = true;
         spawnDust(z.x, GROUND, 2, 12);
+        spawnBlood(z.x, 14, Math.sign(z.vx) || 1, 5);
+        if (Math.random() < 0.6) addSplat(z.x);
       }
       if (z.t - z.launchT > 1.1) z.dead = true;
     }
@@ -2772,7 +2819,7 @@ function update(dt){
     if ((p.type === 'chunk' || p.type === 'shard') && p.y > GROUND) {
       p.y = GROUND; p.vy *= -0.35; p.vx *= 0.7;
     }
-    /* 핏방울: 바닥에 닿으면 핏자국으로 남음 */
+    /* 핏방울: 바닥에 닿으면 웅덩이 핏자국으로 남음 */
     if (p.type === 'blood' && !p.grounded && p.y >= GROUND + 2) {
       p.grounded = true;
       p.y = GROUND + 3;
@@ -3235,7 +3282,15 @@ function render(){
   /* 파괴 흔적 (그을음·잔해 더미) */
   for (const rm of G.remains) {
     if (rm.x + rm.w < G.camX - 80 || rm.x - rm.w > G.camX + viewW + 80) continue;
-    if (rm.kind === 'scorch') {
+    if (rm.kind === 'splat') {
+      const bs = ctx.createRadialGradient(rm.x, GROUND + 4, 2, rm.x, GROUND + 4, rm.w * 0.6);
+      bs.addColorStop(0, 'rgba(122,20,14,.42)');
+      bs.addColorStop(1, 'rgba(122,20,14,0)');
+      ctx.fillStyle = bs;
+      ctx.beginPath();
+      ctx.ellipse(rm.x, GROUND + 4, rm.w * 0.6, 6, 0, 0, 7);
+      ctx.fill();
+    } else if (rm.kind === 'scorch') {
       const sc = ctx.createRadialGradient(rm.x, GROUND + 6, 4, rm.x, GROUND + 6, rm.w * 0.7);
       sc.addColorStop(0, 'rgba(20,16,12,.5)');
       sc.addColorStop(1, 'rgba(20,16,12,0)');
@@ -3579,19 +3634,20 @@ function render(){
       ctx.fill();
       ctx.restore();
       ctx.globalAlpha = 1;
+    } else if (p.type === 'blood') {
+      /* 날 때는 속도 방향으로 늘어난 방울, 바닥에선 웅덩이 */
+      ctx.fillStyle = p.color || '#a8232a';
+      ctx.globalAlpha = p.grounded ? 0.65 * lifeRatio : 0.9;
+      ctx.beginPath();
+      if (p.grounded) ctx.ellipse(p.x, GROUND + 3, p.size * 1.8, p.size * 0.4, 0, 0, 7);
+      else ctx.ellipse(p.x, p.y, p.size, p.size * 1.4, Math.atan2(p.vy, p.vx) + 1.5708, 0, 7);
+      ctx.fill();
+      ctx.globalAlpha = 1;
     } else if (p.type === 'water') {
       ctx.fillStyle = 'rgba(120,190,230,' + (0.75 * lifeRatio) + ')';
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, 7);
       ctx.fill();
-    } else if (p.type === 'blood') {
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = p.grounded ? 0.65 * lifeRatio : 0.9;
-      ctx.beginPath();
-      if (p.grounded) ctx.ellipse(p.x, GROUND + 3, p.size * 1.8, p.size * 0.4, 0, 0, 7);
-      else ctx.arc(p.x, p.y, p.size, 0, 7);
-      ctx.fill();
-      ctx.globalAlpha = 1;
     } else if (p.type === 'spark') {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
