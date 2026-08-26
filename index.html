@@ -310,8 +310,8 @@
   /* 좌우 이동: 슬라이드 패드 — 터치한 지점에서 좌우로 쓸면 이동 */
   #tPad{
     position:absolute;pointer-events:auto;touch-action:none;
-    /* 초소형 세로(360px 등)에서 우측 점프 버튼과 안 겹치게 폭 자동 축소 */
-    left:16px;bottom:78px;width:min(148px, max(110px, calc(100vw - 198px)));height:58px;border-radius:29px;
+    /* 우측 버튼들(자동·점프·주먹)과 안 겹치게 폭 자동 축소 */
+    left:16px;bottom:78px;width:min(148px, max(92px, calc(100vw - 252px)));height:58px;border-radius:29px;
     /* 게임 화면을 가리지 않게 거의 투명 — 드래그 중에만 살짝 진해짐 */
     background:linear-gradient(180deg, rgba(40,45,62,.12), rgba(16,18,28,.18));
     border:1.5px solid rgba(255,255,255,.16);
@@ -376,13 +376,19 @@
   #tRoar {right:78px; bottom:292px}
   #tSpin {right:16px; bottom:292px}
   #tStomp{right:16px; bottom:354px}
-  #tAuto {right:140px;bottom:354px;font-size:12.5px}
+  /* 자동 버튼: 점프 버튼 바로 왼쪽 */
+  #tAuto {right:180px;bottom:82px;width:50px;height:50px;font-size:12px}
   .tbtn .tcd{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     border-radius:50%;background:rgba(22,22,31,.55);
     font-size:14px;color:#ffd23f;pointer-events:none;
   }
   .tbtn .tcd:empty{display:none}
+  /* 초소형 세로: 하단에 자동 버튼 자리가 없어 스킬 그리드로 되돌림 */
+  @media (max-width: 344px) and (min-height: 501px){
+    #tAuto{right:140px;bottom:354px;width:52px;height:52px;font-size:11.5px}
+    #tPad{width:min(148px, max(110px, calc(100vw - 198px)))}
+  }
   body.touchmode #skills{display:none}
   body.touchmode #muteBtn{left:auto;bottom:auto;top:88px;right:14px}
   body.touchmode #pauseBtn{left:auto;bottom:auto;top:88px;right:62px}
@@ -424,7 +430,7 @@
     #tRoar {right:calc(54px + max(16px, env(safe-area-inset-right, 0px)));bottom:208px}
     #tSpin {right:max(16px, env(safe-area-inset-right, 0px));bottom:208px}
     #tStomp{right:max(16px, env(safe-area-inset-right, 0px));bottom:262px}
-    #tAuto {right:calc(108px + max(16px, env(safe-area-inset-right, 0px)));bottom:262px}
+    #tAuto {right:calc(144px + max(16px, env(safe-area-inset-right, 0px)));bottom:max(20px, env(safe-area-inset-bottom, 0px));width:46px;height:46px;font-size:10.5px}
     body.touchmode #muteBtn{top:8px;right:calc(102px + max(16px, env(safe-area-inset-right, 0px)));left:auto;bottom:auto}
     body.touchmode #pauseBtn{top:8px;right:calc(150px + max(16px, env(safe-area-inset-right, 0px)));left:auto;bottom:auto}
     /* 가로: 팝업 패널을 스크롤 없이 한 화면에 압축 */
