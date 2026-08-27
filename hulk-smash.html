@@ -6940,7 +6940,7 @@ function drawHulk(){
   const headR = bodyH * 0.110;
   const hipY = -legH - bob * 0.4 + landCr * 15 * s;
   const thighL = legH * 0.52, shinL = legH * 0.52;
-  const armLenU = bodyH * 0.30, armLenF = bodyH * 0.31; /* 긴 팔 (너클워커 체형) */
+  const armLenU = bodyH * 0.24, armLenF = bodyH * 0.245; /* 긴 팔이되 주먹은 무릎 언저리까지만 */
 
   let lean = 0;
   if (dashing) lean = 0.3;
@@ -7158,7 +7158,9 @@ function drawHulk(){
     const shX = shoulderX(front);
     /* 뒷팔 어깨는 승모근 라인 밑으로 내려 앉힌다 (등 위로 덩어리가 솟는 것 방지) */
     const shY = shYBase + (front ? 0 : bodyW * 0.11);
-    const upL = armLenU * lm, foL = armLenF * lm;
+    /* 뒷팔은 어깨를 낮춘 만큼 짧게 — 안 그러면 주먹이 발목까지 내려온다 */
+    const armK = front ? 1 : 0.82;
+    const upL = armLenU * lm * armK, foL = armLenF * lm * armK;
     const uR = bodyW * (front ? 0.185 : 0.165);
     const fR = bodyW * (front ? 0.21 : 0.185);
     const wR = bodyW * (front ? 0.14 : 0.125);
