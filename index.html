@@ -91,8 +91,10 @@
   }
   .skill{
     width:64px;padding:6px 4px 5px;text-align:center;
-    position:relative;overflow:hidden;
+    position:relative;
     transform:rotate(-1deg);
+    /* overflow:hidden 금지 — 레벨 배지가 칩 바깥(top:-11px)에 있어 통째로 잘렸었다.
+       쿨다운 채움은 .cd 자체에 라운드를 줘서 모서리를 맞춘다 */
   }
   .skill:nth-child(even){transform:rotate(1.5deg)}
   .skill .key{
@@ -106,6 +108,7 @@
   .skill .cd{
     position:absolute;left:0;bottom:0;width:100%;height:0%;
     background:rgba(22,22,31,.45);pointer-events:none;
+    border-radius:0 0 7px 7px;
   }
   .skill .cdt{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
@@ -114,7 +117,7 @@
   }
   .skill .cdt:empty{display:none}
   .skill .lv, .tbtn .lv{
-    position:absolute;top:-11px;right:-10px;
+    position:absolute;top:-11px;right:-10px;z-index:3;
     min-width:30px;height:21px;padding:0 6px;
     background:var(--yellow);border:2.5px solid var(--ink);border-radius:11px;
     box-shadow:2px 2px 0 var(--ink);
@@ -2314,9 +2317,22 @@ function zoomKick(amt){
   G.zoomKick = Math.min(G.zoomKick + amt, 0.12);
 }
 /* 히트스톱: 타격 순간 프레임 정지 (분노 중엔 짧게) */
+let lastImpactT = -1, lastSlowT = -1;
+/* 슬로모션: 연달아 걸리면 게임이 통째로 굼떠 보인다 → 최소 간격을 둔다 */
+function slowmo(sec, force){
+  if (reducedMotion) return;
+  if (!force && G.time - lastSlowT < 1.4) return;
+  lastSlowT = G.time;
+  G.slowMo = Math.max(G.slowMo, Math.min(sec, 0.3));
+}
 function impact(sec){
   if (reducedMotion) return;
   if (G.rageT > 0) sec *= 0.4;
+  sec = Math.min(sec * 0.45, 0.07);   /* 길면 그대로 랙으로 느껴진다 — 약 4프레임 상한 */
+  /* 연타 중 매 타격마다 멈추면 게임 전체가 버벅이는 것처럼 보인다.
+     작은 히트스톱은 0.2초에 한 번만 걸고, 큰 타격은 항상 건다. */
+  if (sec < 0.05 && G.time - lastImpactT < 0.2) return;
+  lastImpactT = G.time;
   G.hitStop = Math.max(G.hitStop, sec);
 }
 /* ---------- 공용 연출 헬퍼 (스킬 이펙트 강화용) ---------- */
@@ -2529,7 +2545,7 @@ function hitZombies(lo, hi, dir){
     if (n >= 6) {
       addRays(H.x, GROUND - hulkH() * 0.5, 12, 'rgba(255,140,110,.9)', 320, 0.32);
       spawnSwirl(H.x, GROUND - hulkH() * 0.45, 16, ['#c22e30', '#ff6a5a', '#ffd9d0'], 380, 60);
-      if (!reducedMotion) G.slowMo = Math.max(G.slowMo, 0.22);
+      slowmo(0.22);
       zoomKick(0.06);
       G.flash = Math.max(G.flash, 0.09);
       SND.bigBoom();
@@ -2579,7 +2595,7 @@ function hulkDown(){
   G.rageT = 0;
   /* 진행 중이던 액션 정리 */
   H.spinT = 0; H.stompN = 0; H.punchT = 0; H.clapT = 0; H.dashT = 0; H.roarT = 0; H.slam = 0;
-  if (!reducedMotion) G.slowMo = 0.6;
+  slowmo(0.6, true);   /* 쓰러짐 연출은 항상 */
   shake(24);
   G.flash = 0.2;
   G.hurtT = 0.6;
@@ -2653,7 +2669,7 @@ function hitBoss(lo, hi, dmg, srcId, srcField){
     G.flash = 0.25;
     impact(0.2);
     zoomKick(0.1);
-    if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.45;
+    if (G.rageT <= 0) slowmo(0.45);
     popup(b.x, GROUND - b.h - 90, 'FINISH!!', 54, '#ffd23f');
     SND.bigBoom();
     SND.roar();
@@ -3014,7 +3030,7 @@ function updateBoss(dt){
         zoomKick(0.12);
         impact(0.18);
         G.flash = 0.3;
-        if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.5;
+        if (G.rageT <= 0) slowmo(0.5);
         /* 헐크 승리 포효 */
         H.roarT = 0.7;
         G.rageGrinT = 1.2;
@@ -3400,7 +3416,7 @@ function destroyObj(o, big){
     }
     spawnDust(cx, GROUND - o.h * 0.5, 10, o.w * 0.6);
     addRays(cx, GROUND - o.h * 0.45, 9, 'rgba(255,240,200,.75)', o.h * 0.8, 0.34);
-    if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.3;
+    if (G.rageT <= 0) slowmo(0.3);
     SND.bigBoom();
   } else {
     o.dying = 1; /* 즉시 제거 → 날아가는 잔해로 대체 */
@@ -3414,7 +3430,7 @@ function destroyObj(o, big){
       G.emitters.push({ x: cx, y: GROUND - 16, t: 0, life: 1.6, kind: 'fire' });
       addScorch(cx, o.w);
       SND.boom();
-      if (o.type === 'tank' && G.rageT <= 0 && !reducedMotion) G.slowMo = 0.25;
+      if (o.type === 'tank' && G.rageT <= 0) slowmo(0.25);
     } else {
       SND.crash();
     }
@@ -3565,7 +3581,7 @@ function slamImpact(){
   for (const o2 of G.objects) {
     if (o2.hp > 0 && Math.abs(o2.x + o2.w / 2 - H.x) < r + 260) o2.wobble = Math.max(o2.wobble, 0.9);
   }
-  if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.2;
+  if (G.rageT <= 0) slowmo(0.2);
   impact(0.16);
   zoomKick(0.09);
   SND.bigBoom(); SND.clap();
@@ -4315,7 +4331,7 @@ function update(dt){
       impact(finale ? 0.09 : 0.05);
       zoomKick(finale ? 0.06 : 0.03);
       if (finale) {
-        if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.16;
+        if (G.rageT <= 0) slowmo(0.16);
         G.flash = Math.max(G.flash, 0.1);
         SND.bigBoom();
       } else {
@@ -8050,8 +8066,11 @@ function loop(now){
   }
   /* 히트스톱(타격 순간 정지) → 슬로모션 → 정상 속도 */
   let dt = rawDt;
-  if (G.hitStop > 0) { G.hitStop -= rawDt; dt = 0; }
-  else if (G.slowMo > 0) { G.slowMo -= rawDt; dt = rawDt * 0.35; }
+  /* 히트스톱을 dt=0(완전 정지)으로 두면 같은 그림이 연속으로 나와 '끊겼다'로 읽힌다.
+     아주 느리게라도 계속 움직이게 하면 타격감은 남고 끊김은 사라진다. */
+  if (G.hitStop > 0) { G.hitStop -= rawDt; dt = rawDt * 0.14; }
+  else if (G.slowMo > 0) { G.slowMo -= rawDt; dt = rawDt * 0.6; }
+  if (G.slowMo > 0.3) G.slowMo = 0.3;   /* 슬로모션이 길게 겹치면 조작이 굼떠 보인다 */
   if (G.state === 'play' || G.state === 'clearing' || G.state === 'defeat') {
     if (dt > 0) update(dt);
   } else {
