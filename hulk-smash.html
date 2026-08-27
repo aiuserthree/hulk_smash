@@ -2031,39 +2031,39 @@ function genStage(n){
 /* 스킨은 처음부터 전부 선택 가능 */
 const SKINS = [
   { id:'savage', name:'새비지 헐크', desc:'원조 녹색 헐크 — 어린아이 같은 지능과 통제할 수 없는 분노',
-    sw:'#65c148', hair:'spiky', hairC:['#2b241d','#1e1813','#12100d'], eye:'#d9f26a', weapon:'beam',
+    sw:'#65c148', hair:'spiky', hairC:['#2b241d','#1e1813','#12100d'], eye:'#d9f26a',
     P:{ hi:'#b2e56c', base:'#65c148', mid:'#419e34', dark:'#2c7c25', deep:'#1d5619' } },
   { id:'grey', name:'그레이 헐크', desc:'미스터 픽싯 — 교활하고 건방진 라스베이거스의 해결사',
-    sw:'#98a0ae', hair:'slick', hairC:['#3a3a44','#232329','#141418'], eye:'#ffe27a', weapon:'bat',
+    sw:'#98a0ae', hair:'slick', hairC:['#3a3a44','#232329','#141418'], eye:'#ffe27a',
     body:{ w:0.92, h:0.99, torso:0.96, leg:1.07, arm:0.95, head:1.05, sh:0.94, bulk:0.91 },
     P:{ hi:'#dfe3ea', base:'#98a0ae', mid:'#6f7886', dark:'#4b5260', deep:'#323844' } },
   { id:'professor', name:'프로페서 헐크', desc:'배너의 지능 + 헐크의 힘 — 이성을 유지한 똑똑한 녹색',
-    sw:'#7fc95e', hair:'neat', hairC:['#4a3b2a','#33291d','#1f1912'], eye:'#bff06a', weapon:'wrench',
+    sw:'#7fc95e', hair:'neat', hairC:['#4a3b2a','#33291d','#1f1912'], eye:'#bff06a',
     body:{ w:0.97, h:1.03, torso:0.98, leg:1.07, arm:0.97, head:1.02, sh:1.02, bulk:0.96 },
     P:{ hi:'#cdef8f', base:'#7fc95e', mid:'#57a343', dark:'#3b7f2e', deep:'#265a1e' } },
   { id:'maestro', name:'마에스트로', desc:'디스토피아 미래의 폭군 — 백발과 수염의 잔혹한 노인',
-    sw:'#5c9440', hair:'long', hairC:['#efe9dc','#c9c2b4','#9b9488'], beard:true, eye:'#ffd24a', weapon:'mace',
+    sw:'#5c9440', hair:'long', hairC:['#efe9dc','#c9c2b4','#9b9488'], beard:true, eye:'#ffd24a',
     body:{ w:1.07, h:1.00, torso:1.07, leg:0.93, arm:1.02, head:1.00, sh:1.00, bulk:1.05 },
     P:{ hi:'#9ecb72', base:'#5c9440', mid:'#417030', dark:'#2d5322', deep:'#1c3716' } },
   { id:'devil', name:'데빌 헐크', desc:'억압된 분노와 트라우마가 만든 가장 냉혹한 인격',
-    sw:'#2f6b3a', hair:'long', hairC:['#241f1a','#16120f','#0b0908'], eye:'#ff5a3c', weapon:'chain',
+    sw:'#2f6b3a', hair:'long', hairC:['#241f1a','#16120f','#0b0908'], eye:'#ff5a3c',
     body:{ w:1.10, h:1.04, torso:1.03, leg:1.00, arm:1.05, head:0.96, sh:1.09, bulk:1.08 },
     P:{ hi:'#5da35c', base:'#2f6b3a', mid:'#204d2a', dark:'#15351d', deep:'#0b2012' } },
   { id:'red', name:'레드 헐크', desc:'로스 장군 — 감마 + 에너지 흡수, 변신 후에도 이성을 유지',
-    sw:'#d1452f', hair:'spiky', hairC:['#2a1512','#1a0d0b','#0f0706'], eye:'#ffd24a', weapon:'blade',
+    sw:'#d1452f', hair:'spiky', hairC:['#2a1512','#1a0d0b','#0f0706'], eye:'#ffd24a',
     body:{ w:1.03, h:1.00, torso:1.00, leg:0.98, arm:1.00, head:1.00, sh:1.06, bulk:1.02 },
     P:{ hi:'#ff9a72', base:'#d1452f', mid:'#a32d1e', dark:'#761a10', deep:'#4a0f09' } },
   { id:'worldwar', name:'월드워 헐크', desc:'우주에서 돌아온 복수 — 분노의 극점, 최강 체급',
-    sw:'#4e8f36', hair:'spiky', hairC:['#1e1813','#141009','#0a0805'], eye:'#ff7a3c', weapon:'hammer',
+    sw:'#4e8f36', hair:'spiky', hairC:['#1e1813','#141009','#0a0805'], eye:'#ff7a3c',
     body:{ w:1.12, h:1.05, torso:1.05, leg:0.98, arm:1.04, head:0.95, sh:1.07, bulk:1.11 },
     P:{ hi:'#8fc65e', base:'#4e8f36', mid:'#356a26', dark:'#234c1a', deep:'#153211' } },
   { id:'gladiator', name:'검투사 헐크', desc:'플래닛 헐크 / 라그나로크 — 사카아르 투기장의 챔피언',
-    sw:'#6f9d4a', hair:'helm', hairC:['#8f2318','#6d1a12','#4a110c'], eye:'#ffe27a', armor:true, weapon:'axe',
+    sw:'#6f9d4a', hair:'helm', hairC:['#8f2318','#6d1a12','#4a110c'], eye:'#ffe27a', armor:true,
     pants:['#4e586a','#333c4a','#1f2630'],
     body:{ w:1.06, h:1.02, torso:1.02, leg:1.00, arm:1.02, head:1.00, sh:1.08, bulk:1.05 },
     P:{ hi:'#a8cf7a', base:'#6f9d4a', mid:'#4f7534', dark:'#375226', deep:'#22351a' } },
   { id:'ultimate', name:'얼티밋 헐크', desc:'지구-1610 — 민머리에 훨씬 잔인하고 폭력적',
-    sw:'#93bb6a', hair:'bald', hairC:['#1e1813','#141009','#0a0805'], eye:'#e8ffb0', weapon:'rubble',
+    sw:'#93bb6a', hair:'bald', hairC:['#1e1813','#141009','#0a0805'], eye:'#e8ffb0',
     body:{ w:0.88, h:1.03, torso:0.97, leg:1.10, arm:0.94, head:0.97, sh:0.95, bulk:0.87 },
     P:{ hi:'#d3e8a8', base:'#93bb6a', mid:'#6e9450', dark:'#4e6f38', deep:'#334a25' } },
 ];
@@ -7328,7 +7328,6 @@ function drawHulk(){
     const fiR = bodyW * (front ? 0.2 : 0.18);
     const fcx = wx + Math.sin(aF) * fiR * 0.55, fcy = wy + Math.cos(aF) * fiR * 0.55;
     drawFist(fcx, fcy, Math.atan2(Math.cos(aF), Math.sin(aF)), fiR, front);
-    if (SKIN.weapon && front) drawWeapon(fcx, fcy, Math.atan2(Math.cos(aF), Math.sin(aF)), fiR, SKIN.weapon);
     /* 휘두르는 팔 잔상 */
     const puncher = punchPh > 0 && !hammering && ((pSeq === 0 && front) || (pSeq === 1 && !front));
     if (puncher && punchPh > 0.2) {
@@ -7355,158 +7354,6 @@ function drawHulk(){
       }
       ctx.restore();
     }
-  }
-
-  /* ---- 스킨별 손무기: 손 원점 기준 +x = 팔 방향, 무기는 -x 쪽으로 뻗는다 ---- */
-  function drawWeapon(cx, cy, canvasAng, r, type){
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(canvasAng + 0.34);   /* 팔 축에서 바깥으로 살짝 기울여 몸통을 덜 가림 */
-    ctx.strokeStyle = 'rgba(14,18,24,.78)';
-    ctx.lineWidth = outW * 0.5;
-    ctx.lineJoin = 'round';
-    const grad = (x0, y0, x1, y1, a, b, c) => {
-      const g = ctx.createLinearGradient(x0, y0, x1, y1);
-      g.addColorStop(0, a); g.addColorStop(0.5, b); g.addColorStop(1, c); return g;
-    };
-    const shaft = (L, w, a, b, c) => {
-      ctx.fillStyle = grad(0, -w, 0, w * 1.8, a, b, c);
-      ctx.beginPath(); ctx.roundRect(-L, -w, L + r * 0.62, w * 2, w);
-      ctx.fill(); ctx.stroke();
-    };
-    const STEEL = ['#9aa3b2', '#5a6270', '#2a3038'];
-    const DARK  = ['#6f747e', '#454a53', '#22252b'];
-    if (type === 'axe') {                       /* 검투사: 양날 전투도끼 */
-      const L = r * 2.45;
-      shaft(L, r * 0.23, DARK[0], DARK[1], DARK[2]);
-      ctx.fillStyle = grad(-L - r, -r * 1.6, -L + r * 0.9, r * 1.6, '#eef2f8', '#9aa3b2', '#4e5561');
-      ctx.beginPath();
-      ctx.moveTo(-L + r * 0.62, -r * 0.26);
-      ctx.quadraticCurveTo(-L + r * 0.28, -r * 1.20, -L - r * 0.48, -r * 1.02);
-      ctx.quadraticCurveTo(-L - r * 0.14, -r * 0.38, -L - r * 0.14, 0);
-      ctx.quadraticCurveTo(-L - r * 0.14, r * 0.38, -L - r * 0.48, r * 1.02);
-      ctx.quadraticCurveTo(-L + r * 0.28, r * 1.20, -L + r * 0.62, r * 0.26);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-    } else if (type === 'hammer') {             /* 월드워: 사각 워해머 */
-      const L = r * 2.5;
-      shaft(L, r * 0.22, DARK[0], DARK[1], DARK[2]);
-      ctx.fillStyle = grad(-L - r * 0.5, -r, -L + r * 0.9, r, STEEL[0], STEEL[1], STEEL[2]);
-      ctx.beginPath(); ctx.roundRect(-L - r * 0.40, -r * 0.86, r * 1.42, r * 1.72, r * 0.16);
-      ctx.fill(); ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(-L + r * 0.30, -r * 0.86); ctx.lineTo(-L + r * 0.30, r * 0.86);
-      ctx.stroke();
-    } else if (type === 'mace') {               /* 마에스트로: 가시 철퇴 */
-      const L = r * 2.3;
-      shaft(L, r * 0.21, DARK[0], DARK[1], DARK[2]);
-      ctx.fillStyle = grad(-L - r * 0.7, -r * 0.7, -L + r * 0.5, r * 0.7, STEEL[0], STEEL[1], STEEL[2]);
-      for (let i = 0; i < 8; i++) {
-        const a = i * Math.PI / 4;
-        ctx.beginPath();
-        ctx.moveTo(-L + Math.cos(a + 0.28) * r * 0.5, Math.sin(a + 0.28) * r * 0.5);
-        ctx.lineTo(-L + Math.cos(a) * r * 1.0, Math.sin(a) * r * 1.0);
-        ctx.lineTo(-L + Math.cos(a - 0.28) * r * 0.5, Math.sin(a - 0.28) * r * 0.5);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-      }
-      ctx.beginPath(); ctx.arc(-L, 0, r * 0.56, 0, 7); ctx.fill(); ctx.stroke();
-    } else if (type === 'bat') {                /* 미스터 픽싯: 야구방망이 */
-      const L = r * 2.7;
-      ctx.fillStyle = grad(0, -r * 0.5, -L, r * 0.5, '#c99356', '#8e5f2c', '#4d3115');
-      capsulePath(r * 0.55, 0, -L, 0, r * 0.19, r * 0.46);
-      ctx.fill(); ctx.stroke();
-      ctx.save();
-      ctx.strokeStyle = 'rgba(30,20,10,.5)'; ctx.lineWidth = outW * 0.45;
-      for (let i = 0; i < 2; i++) {
-        ctx.beginPath();
-        ctx.moveTo(r * 0.1 - i * r * 0.3, -r * 0.21); ctx.lineTo(r * 0.1 - i * r * 0.3, r * 0.21);
-        ctx.stroke();
-      }
-      ctx.restore();
-    } else if (type === 'beam') {               /* 새비지: 뜯어낸 강철 빔 */
-      const L = r * 3.0;
-      ctx.fillStyle = grad(0, -r * 0.45, -L, r * 0.6, STEEL[0], STEEL[1], STEEL[2]);
-      ctx.beginPath();
-      ctx.moveTo(r * 0.55, -r * 0.34);
-      ctx.lineTo(-L + r * 0.2, -r * 0.40);
-      ctx.lineTo(-L - r * 0.35, -r * 0.14);   /* 찢긴 끝 */
-      ctx.lineTo(-L - r * 0.05, r * 0.06);
-      ctx.lineTo(-L - r * 0.45, r * 0.30);
-      ctx.lineTo(-L + r * 0.25, r * 0.42);
-      ctx.lineTo(r * 0.55, r * 0.34);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.save();
-      ctx.strokeStyle = 'rgba(230,238,250,.35)'; ctx.lineWidth = outW * 0.45;
-      ctx.beginPath(); ctx.moveTo(r * 0.3, 0); ctx.lineTo(-L + r * 0.2, 0); ctx.stroke();
-      ctx.restore();
-    } else if (type === 'wrench') {             /* 프로페서: 대형 렌치 */
-      const L = r * 2.5;
-      shaft(L, r * 0.20, STEEL[0], STEEL[1], STEEL[2]);
-      ctx.fillStyle = grad(-L - r * 0.6, -r * 0.8, -L + r * 0.4, r * 0.8, STEEL[0], STEEL[1], STEEL[2]);
-      ctx.beginPath();
-      ctx.moveTo(-L + r * 0.30, -r * 0.24);
-      ctx.lineTo(-L + r * 0.10, -r * 0.78);
-      ctx.lineTo(-L - r * 0.62, -r * 0.72);
-      ctx.lineTo(-L - r * 0.62, -r * 0.24);
-      ctx.lineTo(-L - r * 0.16, -r * 0.20);
-      ctx.lineTo(-L - r * 0.16, r * 0.20);
-      ctx.lineTo(-L - r * 0.62, r * 0.24);
-      ctx.lineTo(-L - r * 0.62, r * 0.72);
-      ctx.lineTo(-L + r * 0.10, r * 0.78);
-      ctx.lineTo(-L + r * 0.30, r * 0.24);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-    } else if (type === 'chain') {              /* 데빌: 쇠사슬 */
-      ctx.save();
-      ctx.lineWidth = outW * 0.85;
-      for (let i = 0; i < 8; i++) {
-        const x = r * 0.35 - i * r * 0.44;
-        ctx.strokeStyle = i % 2 ? '#7d8492' : '#4a515d';
-        ctx.beginPath();
-        ctx.ellipse(x, Math.sin(i * 1.1) * r * 0.10, r * 0.30, r * 0.17, i % 2 ? Math.PI / 2 : 0, 0, 7);
-        ctx.stroke();
-      }
-      ctx.restore();
-    } else if (type === 'blade') {              /* 레드: 군용 대검 */
-      const L = r * 3.0;
-      ctx.fillStyle = grad(0, -r * 0.3, 0, r * 0.3, '#4a4f58', '#2e333a', '#1a1d22');
-      ctx.beginPath(); ctx.roundRect(-r * 0.15, -r * 0.22, r * 0.85, r * 0.44, r * 0.16);
-      ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.roundRect(-r * 0.34, -r * 0.62, r * 0.24, r * 1.24, r * 0.08);
-      ctx.fill(); ctx.stroke();                 /* 코등이 */
-      ctx.fillStyle = grad(-L, -r * 0.5, -r * 0.3, r * 0.5, '#f2f6fc', '#a7b0be', '#565d69');
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.34, -r * 0.42);
-      ctx.lineTo(-L + r * 0.28, -r * 0.34);
-      ctx.lineTo(-L, 0);
-      ctx.lineTo(-L + r * 0.28, r * 0.20);
-      ctx.lineTo(-r * 0.34, r * 0.30);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = outW * 0.45;
-      ctx.beginPath(); ctx.moveTo(-r * 0.5, -r * 0.06); ctx.lineTo(-L + r * 0.4, -r * 0.06); ctx.stroke();
-      ctx.restore();
-    } else if (type === 'rubble') {             /* 얼티밋: 뜯어낸 콘크리트 덩어리 */
-      const cxr = -r * 1.05;
-      ctx.fillStyle = grad(cxr - r, -r, cxr + r, r, '#b9bcc0', '#83878d', '#4c5055');
-      ctx.beginPath();
-      ctx.moveTo(cxr + r * 0.95, -r * 0.30);
-      ctx.lineTo(cxr + r * 0.35, -r * 1.05);
-      ctx.lineTo(cxr - r * 0.55, -r * 0.92);
-      ctx.lineTo(cxr - r * 1.02, -r * 0.10);
-      ctx.lineTo(cxr - r * 0.60, r * 0.88);
-      ctx.lineTo(cxr + r * 0.42, r * 1.00);
-      ctx.lineTo(cxr + r * 0.95, r * 0.34);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.save();
-      ctx.strokeStyle = '#6b5a44'; ctx.lineWidth = outW * 0.7; ctx.lineCap = 'round';
-      for (let i = 0; i < 3; i++) {             /* 철근 */
-        ctx.beginPath();
-        ctx.moveTo(cxr - r * 0.5 + i * r * 0.45, -r * 0.85);
-        ctx.lineTo(cxr - r * 0.75 + i * r * 0.5, -r * 1.55 - i * r * 0.12);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-    ctx.restore();
   }
 
   /* ---- IK 팔: 손을 목표점으로 (합장 박수·해머용) ---- */
@@ -7561,9 +7408,6 @@ function drawHulk(){
       ctx.restore();
     } else {
       drawFist(hx3 + Math.cos(ha) * fiR * 0.5, hy3 + Math.sin(ha) * fiR * 0.5, ha, fiR, front);
-      if (SKIN.weapon && front) {
-        drawWeapon(hx3 + Math.cos(ha) * fiR * 0.5, hy3 + Math.sin(ha) * fiR * 0.5, ha, fiR, SKIN.weapon);
-      }
     }
     return [hx3, hy3];
   }
