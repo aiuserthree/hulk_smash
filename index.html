@@ -2017,24 +2017,36 @@ const SKINS = [
     P:{ hi:'#b2e56c', base:'#65c148', mid:'#419e34', dark:'#2c7c25', deep:'#1d5619' } },
   { id:'grey', name:'그레이 헐크', desc:'미스터 픽싯 — 교활하고 건방진 라스베이거스의 해결사',
     sw:'#98a0ae', hair:'slick', hairC:['#3a3a44','#232329','#141418'], eye:'#ffe27a',
+    body:{ w:0.92, h:0.99, torso:0.96, leg:1.07, arm:0.95, head:1.05, sh:0.94, bulk:0.91 },
     P:{ hi:'#dfe3ea', base:'#98a0ae', mid:'#6f7886', dark:'#4b5260', deep:'#323844' } },
   { id:'professor', name:'프로페서 헐크', desc:'배너의 지능 + 헐크의 힘 — 이성을 유지한 똑똑한 녹색',
     sw:'#7fc95e', hair:'neat', hairC:['#4a3b2a','#33291d','#1f1912'], eye:'#bff06a',
+    body:{ w:0.97, h:1.03, torso:0.98, leg:1.07, arm:0.97, head:1.02, sh:1.02, bulk:0.96 },
     P:{ hi:'#cdef8f', base:'#7fc95e', mid:'#57a343', dark:'#3b7f2e', deep:'#265a1e' } },
   { id:'maestro', name:'마에스트로', desc:'디스토피아 미래의 폭군 — 백발과 수염의 잔혹한 노인',
     sw:'#5c9440', hair:'long', hairC:['#efe9dc','#c9c2b4','#9b9488'], beard:true, eye:'#ffd24a',
+    body:{ w:1.07, h:1.00, torso:1.07, leg:0.93, arm:1.02, head:1.00, sh:1.00, bulk:1.05 },
     P:{ hi:'#9ecb72', base:'#5c9440', mid:'#417030', dark:'#2d5322', deep:'#1c3716' } },
   { id:'devil', name:'데빌 헐크', desc:'억압된 분노와 트라우마가 만든 가장 냉혹한 인격',
     sw:'#2f6b3a', hair:'long', hairC:['#241f1a','#16120f','#0b0908'], eye:'#ff5a3c',
+    body:{ w:1.10, h:1.04, torso:1.03, leg:1.00, arm:1.05, head:0.96, sh:1.09, bulk:1.08 },
     P:{ hi:'#5da35c', base:'#2f6b3a', mid:'#204d2a', dark:'#15351d', deep:'#0b2012' } },
   { id:'red', name:'레드 헐크', desc:'로스 장군 — 감마 + 에너지 흡수, 변신 후에도 이성을 유지',
     sw:'#d1452f', hair:'spiky', hairC:['#2a1512','#1a0d0b','#0f0706'], eye:'#ffd24a',
+    body:{ w:1.03, h:1.00, torso:1.00, leg:0.98, arm:1.00, head:1.00, sh:1.06, bulk:1.02 },
     P:{ hi:'#ff9a72', base:'#d1452f', mid:'#a32d1e', dark:'#761a10', deep:'#4a0f09' } },
   { id:'worldwar', name:'월드워 헐크', desc:'우주에서 돌아온 복수 — 분노의 극점, 최강 체급',
     sw:'#4e8f36', hair:'spiky', hairC:['#1e1813','#141009','#0a0805'], eye:'#ff7a3c',
+    body:{ w:1.12, h:1.05, torso:1.05, leg:0.98, arm:1.04, head:0.95, sh:1.07, bulk:1.11 },
     P:{ hi:'#8fc65e', base:'#4e8f36', mid:'#356a26', dark:'#234c1a', deep:'#153211' } },
+  { id:'gladiator', name:'검투사 헐크', desc:'플래닛 헐크 / 라그나로크 — 사카아르 투기장의 챔피언',
+    sw:'#6f9d4a', hair:'helm', hairC:['#8f2318','#6d1a12','#4a110c'], eye:'#ffe27a', armor:true,
+    pants:['#4e586a','#333c4a','#1f2630'],
+    body:{ w:1.06, h:1.02, torso:1.02, leg:1.00, arm:1.02, head:1.00, sh:1.08, bulk:1.05 },
+    P:{ hi:'#a8cf7a', base:'#6f9d4a', mid:'#4f7534', dark:'#375226', deep:'#22351a' } },
   { id:'ultimate', name:'얼티밋 헐크', desc:'지구-1610 — 민머리에 훨씬 잔인하고 폭력적',
     sw:'#93bb6a', hair:'bald', hairC:['#1e1813','#141009','#0a0805'], eye:'#e8ffb0',
+    body:{ w:0.88, h:1.03, torso:0.97, leg:1.10, arm:0.94, head:0.97, sh:0.95, bulk:0.87 },
     P:{ hi:'#d3e8a8', base:'#93bb6a', mid:'#6e9450', dark:'#4e6f38', deep:'#334a25' } },
 ];
 const REC_KEY = 'hulkSmash.records.v1';
@@ -6886,7 +6898,11 @@ const easeIn3 = t => t * t * t;
 function drawHulk(){
   const s = hulkScale();
   const raging = G.rageT > 0;
-  const bodyH = hulkH(), bodyW = hulkW();
+  /* 코믹스 버전별 체형 — 그림 실루엣만 바뀌고 판정 크기(hulkW/hulkH)는 그대로 */
+  const SKIN = currentSkin();
+  const BD = SKIN.body || {};
+  const bulk = BD.bulk || 1;
+  const bodyH = hulkH() * (BD.h || 1), bodyW = hulkW() * (BD.w || 1);
   const t2 = H.walkT * 2;
   const swing = Math.sin(t2) * 0.5;
   const moving = Math.abs(H.vx) > 10;
@@ -6910,15 +6926,17 @@ function drawHulk(){
     ? { hi:'#ff9d5e', base:'#d43a26', mid:'#a5231a', dark:'#761410', deep:'#4a0b09' }
     : currentSkin().P;
   /* 코믹스 버전별 특징: 머리 모양·머리색·수염·눈색 */
-  const SKIN = currentSkin();
   const hairStyle = SKIN.hair || 'spiky';
   const hairC = SKIN.hairC || ['#2b241d', '#1e1813', '#12100d'];
   const hasBeard = !!SKIN.beard;
   const eyeC = raging ? '#ffdc4a' : (SKIN.eye || '#d9f26a');
   const skinF = [[0, P.hi], [0.42, P.base], [1, P.dark]];
   const skinB = [[0, P.base], [0.42, P.mid], [1, P.deep]];
-  const jeanF = [[0, '#3f4a72'], [0.5, '#2c3456'], [1, '#1d2440']];
-  const jeanB = [[0, '#2c3456'], [0.5, '#232a48'], [1, '#171d34']];
+  const pants = SKIN.pants || ['#3f4a72', '#2c3456', '#1d2440'];
+  const jeanF = [[0, pants[0]], [0.5, pants[1]], [1, pants[2]]];
+  const jeanB = [[0, pants[1]], [0.5, pants[2]], [1, mixHex(pants[2], '#000000', 0.35)]];
+  const steelF = [[0, '#8792a6'], [0.5, '#4f5a6b'], [1, '#262d38']];
+  const steelB = [[0, '#5f6a7a'], [0.5, '#3a4350'], [1, '#1c222b']];
   const outline = 'rgba(20,28,10,.5)';
   const defLine = 'rgba(46,68,22,.5)'; /* 근육 정의선 */
   const outW = 2.2 * Math.min(s, 1.4);
@@ -6974,12 +6992,12 @@ function drawHulk(){
   const airTuck = !H.onGround ? 1 - Math.min(1, Math.abs(H.vy) / 700) : 0;
 
   /* 초근육질 체형: 넓은 어깨, 굵은 전완, 짧고 굵은 다리 */
-  const legH = bodyH * 0.42;
-  const torsoH = bodyH * 0.48;
-  const headR = bodyH * 0.110;
+  const legH = bodyH * 0.42 * (BD.leg || 1);
+  const torsoH = bodyH * 0.48 * (BD.torso || 1);
+  const headR = bodyH * 0.110 * (BD.head || 1);
   const hipY = -legH - bob * 0.4 + landCr * 15 * s;
   const thighL = legH * 0.52, shinL = legH * 0.52;
-  const armLenU = bodyH * 0.24, armLenF = bodyH * 0.245; /* 긴 팔이되 주먹은 무릎 언저리까지만 */
+  const armLenU = bodyH * 0.24 * (BD.arm || 1), armLenF = bodyH * 0.245 * (BD.arm || 1); /* 긴 팔이되 주먹은 무릎 언저리까지만 */
 
   let lean = 0;
   if (dashing) lean = 0.3;
@@ -7002,7 +7020,7 @@ function drawHulk(){
   }
 
   const shYBase = hipY - torsoH * 0.76;
-  function shoulderX(front){ return front ? bodyW * 0.40 : -bodyW * 0.38; }
+  function shoulderX(front){ return (front ? bodyW * 0.40 : -bodyW * 0.38) * (BD.sh || 1); }
 
   /* ---- 다리 ---- */
   function leg(px, phase, front){
@@ -7035,7 +7053,7 @@ function drawHulk(){
     const kx = hx + Math.sin(thA) * thighL, ky = hy + Math.cos(thA) * thighL;
     const sA = thA - knee;
     const ax = kx + Math.sin(sA) * shinL, ay = ky + Math.cos(sA) * shinL;
-    const thR = bodyW * 0.24, knR = bodyW * 0.145, caR = bodyW * 0.19, anR = bodyW * 0.1;
+    const thR = bodyW * 0.24 * bulk, knR = bodyW * 0.145 * bulk, caR = bodyW * 0.19 * bulk, anR = bodyW * 0.1;
     /* 종아리 */
     limbG(kx, ky, ax, ay, caR, anR, front ? skinF : skinB);
     /* 발 */
@@ -7200,9 +7218,9 @@ function drawHulk(){
     /* 뒷팔은 어깨를 낮춘 만큼 짧게 — 안 그러면 주먹이 발목까지 내려온다 */
     const armK = front ? 1 : 0.82;
     const upL = armLenU * lm * armK, foL = armLenF * lm * armK;
-    const uR = bodyW * (front ? 0.185 : 0.165);
-    const fR = bodyW * (front ? 0.21 : 0.185);
-    const wR = bodyW * (front ? 0.14 : 0.125);
+    const uR = bodyW * (front ? 0.185 : 0.165) * bulk;
+    const fR = bodyW * (front ? 0.21 : 0.185) * bulk;
+    const wR = bodyW * (front ? 0.14 : 0.125) * bulk;
     const sk = front ? skinF : skinB;
     const ex = shX + Math.sin(angU) * upL, ey = shY + Math.cos(angU) * upL;
     const aF = angU + bend;
@@ -7216,6 +7234,28 @@ function drawHulk(){
     const blendX = lerp2(shX, ex, 0.26), blendY = lerp2(shY, ey, 0.26);
     limbG(rootX, rootY, blendX, blendY, uR * 1.12, uR * 1.30, sk, true);
     deltoid(front, shX, shY);
+    if (SKIN.armor) {
+      /* 검투사 장비: 층을 이룬 견갑 + 전완 브레이서 */
+      limbG(lerp2(ex, wx, 0.60), lerp2(ey, wy, 0.60), wx, wy,
+            fR * 0.90, wR * 1.20, front ? steelF : steelB);
+      const dir = front ? 1 : -1;
+      const pg = ctx.createLinearGradient(shX - uR, shY - uR * 1.2, shX + uR * dir, shY + uR * 1.4);
+      pg.addColorStop(0, front ? '#98a3b4' : '#6c7686');
+      pg.addColorStop(0.5, front ? '#525d6e' : '#3c4552');
+      pg.addColorStop(1, '#242b35');
+      ctx.save();
+      ctx.strokeStyle = 'rgba(16,22,30,.7)';
+      ctx.lineWidth = outW * 0.55;
+      for (let i = 2; i >= 0; i--) {
+        ctx.fillStyle = pg;
+        ctx.beginPath();
+        ctx.ellipse(shX + dir * uR * 0.10 * i, shY + uR * (-0.12 + i * 0.36),
+                    uR * (1.22 - i * 0.14), uR * (0.82 - i * 0.22), dir * 0.14, Math.PI * 0.98, Math.PI * 2.02);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     /* 분노: 팔 감마 크랙 */
     if (raging && front) {
       ctx.save();
@@ -7289,9 +7329,9 @@ function drawHulk(){
   /* ---- IK 팔: 손을 목표점으로 (합장 박수·해머용) ---- */
   function armTo(front, hxT, hyT, elbowSign, palm){
     const shX = shoulderX(front), shY = shYBase;
-    const uR = bodyW * (front ? 0.185 : 0.165);
-    const fR = bodyW * (front ? 0.21 : 0.185);
-    const wR = bodyW * (front ? 0.14 : 0.125);
+    const uR = bodyW * (front ? 0.185 : 0.165) * bulk;
+    const fR = bodyW * (front ? 0.21 : 0.185) * bulk;
+    const wR = bodyW * (front ? 0.14 : 0.125) * bulk;
     let dx = hxT - shX, dy = hyT - shY;
     let dist = Math.hypot(dx, dy) || 1;
     const maxD = armLenU + armLenF - 6;
@@ -7659,6 +7699,40 @@ function drawHulk(){
         ctx.stroke();
       }
       ctx.restore();
+    } else if (hairStyle === 'helm') {
+      /* 검투사 헐크: 붉은 볏이 달린 금속 투구 (눈·눈썹은 뒤에 그려져 얼굴이 드러난다) */
+      ctx.beginPath();                                  /* 볏(모히칸) */
+      ctx.moveTo(hx + headR * 0.60, hy - headR * 1.00);
+      ctx.quadraticCurveTo(hx + headR * 0.20, hy - headR * 2.00, hx - headR * 0.80, hy - headR * 1.62);
+      ctx.quadraticCurveTo(hx - headR * 0.44, hy - headR * 1.12, hx - headR * 0.10, hy - headR * 1.14);
+      ctx.closePath();
+      ctx.fill();
+      const mg = ctx.createLinearGradient(hx - headR, hy - headR * 1.2, hx + headR * 0.8, hy + headR * 0.6);
+      mg.addColorStop(0, '#98a3b4');
+      mg.addColorStop(0.45, '#5c6675');
+      mg.addColorStop(1, '#2d3542');
+      ctx.fillStyle = mg;
+      ctx.beginPath();
+      ctx.moveTo(hx + headR * 0.98, hy - headR * 0.34);
+      ctx.quadraticCurveTo(hx + headR * 1.06, hy - headR * 0.94, hx + headR * 0.22, hy - headR * 1.16);
+      ctx.quadraticCurveTo(hx - headR * 0.78, hy - headR * 1.22, hx - headR * 1.10, hy - headR * 0.44);
+      ctx.quadraticCurveTo(hx - headR * 1.28, hy + headR * 0.30, hx - headR * 0.88, hy + headR * 0.74); /* 목가리개 */
+      ctx.lineTo(hx - headR * 0.44, hy + headR * 0.48);
+      ctx.quadraticCurveTo(hx - headR * 0.62, hy - headR * 0.20, hx - headR * 0.24, hy - headR * 0.52);
+      ctx.quadraticCurveTo(hx + headR * 0.34, hy - headR * 0.76, hx + headR * 0.76, hy - headR * 0.48);
+      ctx.closePath();
+      ctx.fill();
+      ctx.save();
+      ctx.strokeStyle = 'rgba(16,22,30,.75)';
+      ctx.lineWidth = outW * 0.55;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(206,216,232,.45)';           /* 리벳 */
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(hx - headR * (0.78 - i * 0.32), hy - headR * (0.66 - i * 0.16), headR * 0.062, 0, 7);
+        ctx.fill();
+      }
+      ctx.restore();
     } else if (hairStyle === 'slick') {
       /* 미스터 픽싯: 기름 발라 뒤로 넘긴 올백 */
       ctx.beginPath();
@@ -7724,7 +7798,7 @@ function drawHulk(){
       ctx.closePath();
       ctx.fill();
     }
-    if (hairStyle !== 'bald') {
+    if (hairStyle !== 'bald' && hairStyle !== 'helm') {
       ctx.save();
       ctx.strokeStyle = 'rgba(150,132,112,.32)';
       ctx.lineWidth = outW * 0.42;
