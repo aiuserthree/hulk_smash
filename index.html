@@ -718,7 +718,7 @@
       </div>
       <div id="saveInfo" style="display:none;margin-top:10px;font-size:12px;font-weight:700;color:#6a6350"></div>
       <div id="skinWrap">
-        <div id="skinTitle">💚 헐크 스킨 — 원하는 색으로 시작</div>
+        <div id="skinTitle">💚 헐크 버전 — 코믹스 인격을 골라 시작</div>
         <div id="skinRow"></div>
         <div id="recLine"></div>
       </div>
@@ -763,7 +763,7 @@
     <div class="panel">
       <div class="burst-title" style="font-size:44px">잠깐 휴식</div>
       <div id="pauseSkinWrap">
-        <div id="skinTitle2">💚 헐크 스킨 — 지금 바로 바꿀 수 있다</div>
+        <div id="skinTitle2">💚 헐크 버전 — 지금 바로 바꿀 수 있다</div>
         <div id="skinRow2"></div>
       </div>
       <div style="display:flex;gap:12px;justify-content:center;margin-top:10px">
@@ -1605,11 +1605,11 @@ const H = {
 function hulkScale(){
   /* 거대화 버프: 시작·끝 0.35초 부드럽게 커졌다 줄어듦 (연장해도 스냅 없음) */
   const giant = G.buffGiantT > 0
-    ? 1 + 0.25 * clamp(G.buffGiantT / 0.35, 0, 1) * clamp(G.buffGiantIn / 0.35, 0, 1)
+    ? 1 + 0.13 * clamp(G.buffGiantT / 0.35, 0, 1) * clamp(G.buffGiantIn / 0.35, 0, 1)
     : 1;
   const touch = document.body.classList.contains('touchmode');
   const raw = (1 + Math.min(G.stage - 1, 9) * 0.11)
-    * (1 + (touch ? 0.16 : 0.35) * G.rageRamp)
+    * (1 + (touch ? 0.14 : 0.18) * G.rageRamp)
     * (1 + 0.06 * G.upgrades.size)
     * giant;
   /* 모바일에서만 덩치 상한 (PC는 창 크기와 무관하게 원래 크기 유지) */
@@ -1642,6 +1642,11 @@ addEventListener('keydown', e => {
   if (['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(c)) e.preventDefault();
   if (e.repeat) return;
   initAudio();
+  /* 클리어 화면: 스페이스/엔터로 다음 스테이지 (보상 선택 중엔 카드로만 진행) */
+  if (G.state === 'clear' && (c === 'Space' || c === 'Enter' || c === 'NumpadEnter')) {
+    if (ui.nextBtn.style.display !== 'none') nextStage();
+    return;
+  }
   switch (c) {
     case 'ArrowLeft': case 'KeyA': moveSrc.kbL = true; applyMove(); break;
     case 'ArrowRight': case 'KeyD': moveSrc.kbR = true; applyMove(); break;
@@ -2007,21 +2012,33 @@ function genStage(n){
 /* ---------- 헐크 스킨 + 영구 기록 ---------- */
 /* 스킨은 처음부터 전부 선택 가능 */
 const SKINS = [
-  { id: 'green', name: '클래식 그린',
-    sw: '#65c148', P: { hi:'#b2e56c', base:'#65c148', mid:'#419e34', dark:'#2c7c25', deep:'#1d5619' } },
-  { id: 'grey',  name: '그레이 헐크',
-    sw: '#98a0ae', P: { hi:'#dfe3ea', base:'#98a0ae', mid:'#6f7886', dark:'#4b5260', deep:'#323844' } },
-  { id: 'blue',  name: '딥 블루',
-    sw: '#3f8fd6', P: { hi:'#9ddaff', base:'#3f8fd6', mid:'#2b6aa8', dark:'#1c4a7a', deep:'#12314f' } },
-  { id: 'gold',  name: '골드 헐크',
-    sw: '#e0b23c', P: { hi:'#ffeaa6', base:'#e0b23c', mid:'#b88a22', dark:'#8a6416', deep:'#5c410d' } },
-  { id: 'neon',  name: '네온 퍼플',
-    sw: '#a55ce0', P: { hi:'#e8bcff', base:'#a55ce0', mid:'#7d3cb8', dark:'#5a2688', deep:'#3a1559' } },
-  { id: 'crimson', name: '크림슨',
-    sw: '#d1452f', P: { hi:'#ffa98c', base:'#d1452f', mid:'#a32d1e', dark:'#761a10', deep:'#4a0f09' } },
+  { id:'savage', name:'새비지 헐크', desc:'원조 녹색 헐크 — 어린아이 같은 지능과 통제할 수 없는 분노',
+    sw:'#65c148', hair:'spiky', hairC:['#2b241d','#1e1813','#12100d'], eye:'#d9f26a',
+    P:{ hi:'#b2e56c', base:'#65c148', mid:'#419e34', dark:'#2c7c25', deep:'#1d5619' } },
+  { id:'grey', name:'그레이 헐크', desc:'미스터 픽싯 — 교활하고 건방진 라스베이거스의 해결사',
+    sw:'#98a0ae', hair:'slick', hairC:['#3a3a44','#232329','#141418'], eye:'#ffe27a',
+    P:{ hi:'#dfe3ea', base:'#98a0ae', mid:'#6f7886', dark:'#4b5260', deep:'#323844' } },
+  { id:'professor', name:'프로페서 헐크', desc:'배너의 지능 + 헐크의 힘 — 이성을 유지한 똑똑한 녹색',
+    sw:'#7fc95e', hair:'neat', hairC:['#4a3b2a','#33291d','#1f1912'], eye:'#bff06a',
+    P:{ hi:'#cdef8f', base:'#7fc95e', mid:'#57a343', dark:'#3b7f2e', deep:'#265a1e' } },
+  { id:'maestro', name:'마에스트로', desc:'디스토피아 미래의 폭군 — 백발과 수염의 잔혹한 노인',
+    sw:'#5c9440', hair:'long', hairC:['#efe9dc','#c9c2b4','#9b9488'], beard:true, eye:'#ffd24a',
+    P:{ hi:'#9ecb72', base:'#5c9440', mid:'#417030', dark:'#2d5322', deep:'#1c3716' } },
+  { id:'devil', name:'데빌 헐크', desc:'억압된 분노와 트라우마가 만든 가장 냉혹한 인격',
+    sw:'#2f6b3a', hair:'long', hairC:['#241f1a','#16120f','#0b0908'], eye:'#ff5a3c',
+    P:{ hi:'#5da35c', base:'#2f6b3a', mid:'#204d2a', dark:'#15351d', deep:'#0b2012' } },
+  { id:'red', name:'레드 헐크', desc:'로스 장군 — 감마 + 에너지 흡수, 변신 후에도 이성을 유지',
+    sw:'#d1452f', hair:'spiky', hairC:['#2a1512','#1a0d0b','#0f0706'], eye:'#ffd24a',
+    P:{ hi:'#ff9a72', base:'#d1452f', mid:'#a32d1e', dark:'#761a10', deep:'#4a0f09' } },
+  { id:'worldwar', name:'월드워 헐크', desc:'우주에서 돌아온 복수 — 분노의 극점, 최강 체급',
+    sw:'#4e8f36', hair:'spiky', hairC:['#1e1813','#141009','#0a0805'], eye:'#ff7a3c',
+    P:{ hi:'#8fc65e', base:'#4e8f36', mid:'#356a26', dark:'#234c1a', deep:'#153211' } },
+  { id:'ultimate', name:'얼티밋 헐크', desc:'지구-1610 — 민머리에 훨씬 잔인하고 폭력적',
+    sw:'#93bb6a', hair:'bald', hairC:['#1e1813','#141009','#0a0805'], eye:'#e8ffb0',
+    P:{ hi:'#d3e8a8', base:'#93bb6a', mid:'#6e9450', dark:'#4e6f38', deep:'#334a25' } },
 ];
 const REC_KEY = 'hulkSmash.records.v1';
-let RECORDS = { smash: 0, stage: 1, score: 0, combo: 0, skin: 'green' };
+let RECORDS = { smash: 0, stage: 1, score: 0, combo: 0, skin: 'savage' };
 function loadRecords(){
   try {
     const raw = localStorage.getItem(REC_KEY);
@@ -2138,7 +2155,9 @@ function renderSkins(){
     for (const sk of SKINS) {
       const el = document.createElement('div');
       el.className = 'skinChip' + (RECORDS.skin === sk.id ? ' sel' : '');
-      el.innerHTML = '<div class="dot" style="background:' + sk.sw + '"></div>'
+      el.title = sk.desc || sk.name;
+      el.innerHTML = '<div class="dot" style="background:' + sk.sw
+        + ';box-shadow:inset 0 0 0 3px ' + (sk.hair === 'bald' ? sk.sw : sk.hairC[1]) + '"></div>'
         + '<div class="nm">' + sk.name + '</div>';
       el.addEventListener('click', () => {
         RECORDS.skin = sk.id;
@@ -4751,6 +4770,8 @@ function showClear(){
     ui.upgradeRow.classList.remove('on');
     ui.nextBtn.style.display = '';
   }
+  ui.nextBtn.textContent = document.body.classList.contains('touchmode')
+    ? '다음 동네 부수러 →' : '다음 동네 부수러 →   [Space]';
   ui.growthMsg.textContent = G.stage < 10
     ? '💪 헐크가 더 커졌다! 덩치 +11%, 파워 UP!'
     : '💪 파워가 더 강해졌다!';
@@ -4762,6 +4783,10 @@ function showClear(){
 /* ============================================================
    렌더링 (시네마틱 스타일)
    ============================================================ */
+function hexA(h, a){
+  const p = parseInt(h.slice(1), 16);
+  return 'rgba(' + ((p >> 16) & 255) + ',' + ((p >> 8) & 255) + ',' + (p & 255) + ',' + a + ')';
+}
 function mixHex(a, b, f){
   const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
   const r = Math.round(((pa >> 16) & 255) * (1 - f) + ((pb >> 16) & 255) * f);
@@ -6884,6 +6909,12 @@ function drawHulk(){
   const P = raging
     ? { hi:'#ff9d5e', base:'#d43a26', mid:'#a5231a', dark:'#761410', deep:'#4a0b09' }
     : currentSkin().P;
+  /* 코믹스 버전별 특징: 머리 모양·머리색·수염·눈색 */
+  const SKIN = currentSkin();
+  const hairStyle = SKIN.hair || 'spiky';
+  const hairC = SKIN.hairC || ['#2b241d', '#1e1813', '#12100d'];
+  const hasBeard = !!SKIN.beard;
+  const eyeC = raging ? '#ffdc4a' : (SKIN.eye || '#d9f26a');
   const skinF = [[0, P.hi], [0.42, P.base], [1, P.dark]];
   const skinB = [[0, P.base], [0.42, P.mid], [1, P.deep]];
   const jeanF = [[0, '#3f4a72'], [0.5, '#2c3456'], [1, '#1d2440']];
@@ -7591,44 +7622,122 @@ function drawHulk(){
     ctx.beginPath();
     ctx.arc(hx - headR * 0.52, hy + headR * 0.18, headR * 0.19, 0, 7);
     ctx.fill();
-    /* 헝클어진 짧은 흑갈색 머리 (레퍼런스) */
+    /* ---------- 머리 모양: 코믹스 버전마다 다르다 ---------- */
     const hairG = ctx.createLinearGradient(hx - headR, hy - headR * 1.2, hx + headR * 0.6, hy);
-    hairG.addColorStop(0, '#2b241d');
-    hairG.addColorStop(0.55, '#1e1813');
-    hairG.addColorStop(1, '#12100d');
-    ctx.fillStyle = hairG;
-    ctx.beginPath();
-    ctx.moveTo(hx + headR * 0.84, hy - headR * 0.30);
-    ctx.lineTo(hx + headR * 0.60, hy - headR * 0.60);
-    ctx.lineTo(hx + headR * 0.72, hy - headR * 0.90);
-    ctx.lineTo(hx + headR * 0.38, hy - headR * 0.84);
-    ctx.lineTo(hx + headR * 0.44, hy - headR * 1.20);
-    ctx.lineTo(hx + headR * 0.08, hy - headR * 0.98);
-    ctx.lineTo(hx - headR * 0.08, hy - headR * 1.26);
-    ctx.lineTo(hx - headR * 0.42, hy - headR * 1.00);
-    ctx.lineTo(hx - headR * 0.64, hy - headR * 1.20);
-    ctx.lineTo(hx - headR * 0.82, hy - headR * 0.84);
-    ctx.lineTo(hx - headR * 1.02, hy - headR * 0.88);
-    ctx.lineTo(hx - headR * 0.96, hy - headR * 0.34);
-    ctx.lineTo(hx - headR * 1.04, hy + headR * 0.08);
-    ctx.lineTo(hx - headR * 0.78, hy);
-    ctx.lineTo(hx - headR * 0.70, hy + headR * 0.28);
-    ctx.lineTo(hx - headR * 0.50, hy - headR * 0.08);
-    ctx.quadraticCurveTo(hx - headR * 0.1, hy - headR * 0.48, hx + headR * 0.48, hy - headR * 0.36);
-    ctx.closePath();
-    ctx.fill();
-    ctx.save();
-    ctx.strokeStyle = 'rgba(150,132,112,.32)';
-    ctx.lineWidth = outW * 0.42;
-    ctx.lineCap = 'round';
-    for (let i = 0; i < 3; i++) {
+    hairG.addColorStop(0, hairC[0]);
+    hairG.addColorStop(0.55, hairC[1]);
+    hairG.addColorStop(1, hairC[2]);
+    if (hasBeard) {
+      /* 마에스트로: 턱을 덮는 덥수룩한 수염 (코·입은 뒤에 다시 그려져 위로 올라온다) */
+      ctx.fillStyle = hairG;
       ctx.beginPath();
-      ctx.moveTo(hx - headR * (0.62 - i * 0.34), hy - headR * (0.96 - i * 0.06));
-      ctx.quadraticCurveTo(hx - headR * (0.3 - i * 0.34), hy - headR * (1.06 - i * 0.04),
-                           hx + headR * (0.06 + i * 0.3), hy - headR * (0.86 - i * 0.02));
+      ctx.moveTo(hx + headR * 1.00, hy + headR * 0.28);
+      ctx.quadraticCurveTo(hx + headR * 1.24, hy + headR * 1.18, hx + headR * 0.52, hy + headR * 1.66);
+      ctx.quadraticCurveTo(hx - headR * 0.10, hy + headR * 1.80, hx - headR * 0.50, hy + headR * 1.02);
+      ctx.quadraticCurveTo(hx - headR * 0.74, hy + headR * 0.48, hx - headR * 0.46, hy + headR * 0.20);
+      ctx.quadraticCurveTo(hx + headR * 0.12, hy + headR * 1.00, hx + headR * 0.94, hy + headR * 0.64);
+      ctx.closePath();
+      ctx.fill();
+      ctx.save();                       /* 머리와 한 덩어리로 붙어 보이지 않게 경계선 */
+      ctx.strokeStyle = hairC[2];
+      ctx.lineWidth = outW * 0.6;
       ctx.stroke();
+      ctx.restore();
     }
-    ctx.restore();
+    ctx.fillStyle = hairG;
+    if (hairStyle === 'bald') {
+      /* 얼티밋 헐크: 민머리 — 두피에 힘줄만 */
+      ctx.save();
+      ctx.strokeStyle = 'rgba(28,48,14,.38)';
+      ctx.lineWidth = outW * 0.45;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(hx - headR * (0.54 - i * 0.30), hy - headR * (0.86 - i * 0.10));
+        ctx.quadraticCurveTo(hx - headR * (0.14 - i * 0.30), hy - headR * (0.60 - i * 0.06),
+                             hx + headR * (0.22 + i * 0.26), hy - headR * (0.70 - i * 0.04));
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (hairStyle === 'slick') {
+      /* 미스터 픽싯: 기름 발라 뒤로 넘긴 올백 */
+      ctx.beginPath();
+      ctx.moveTo(hx + headR * 0.88, hy - headR * 0.30);
+      ctx.quadraticCurveTo(hx + headR * 0.62, hy - headR * 1.12, hx - headR * 0.24, hy - headR * 1.08);
+      ctx.quadraticCurveTo(hx - headR * 1.02, hy - headR * 1.00, hx - headR * 1.18, hy - headR * 0.26);
+      ctx.lineTo(hx - headR * 1.36, hy + headR * 0.24);
+      ctx.lineTo(hx - headR * 0.94, hy + headR * 0.12);
+      ctx.lineTo(hx - headR * 1.02, hy + headR * 0.48);
+      ctx.lineTo(hx - headR * 0.66, hy - headR * 0.06);
+      ctx.quadraticCurveTo(hx - headR * 0.50, hy - headR * 0.62, hx + headR * 0.02, hy - headR * 0.74);
+      ctx.quadraticCurveTo(hx + headR * 0.46, hy - headR * 0.80, hx + headR * 0.56, hy - headR * 0.40);
+      ctx.closePath();
+      ctx.fill();
+    } else if (hairStyle === 'neat') {
+      /* 프로페서 헐크: 가르마 탄 단정한 짧은 머리 */
+      ctx.beginPath();
+      ctx.moveTo(hx + headR * 0.90, hy - headR * 0.34);
+      ctx.quadraticCurveTo(hx + headR * 0.74, hy - headR * 1.04, hx - headR * 0.06, hy - headR * 1.04);
+      ctx.quadraticCurveTo(hx - headR * 0.92, hy - headR * 1.00, hx - headR * 1.06, hy - headR * 0.34);
+      ctx.lineTo(hx - headR * 1.06, hy + headR * 0.18);
+      ctx.lineTo(hx - headR * 0.78, hy + headR * 0.04);
+      ctx.quadraticCurveTo(hx - headR * 0.82, hy - headR * 0.50, hx - headR * 0.30, hy - headR * 0.66);
+      ctx.lineTo(hx + headR * 0.28, hy - headR * 0.50);
+      ctx.lineTo(hx + headR * 0.22, hy - headR * 0.74);
+      ctx.quadraticCurveTo(hx + headR * 0.64, hy - headR * 0.66, hx + headR * 0.64, hy - headR * 0.40);
+      ctx.closePath();
+      ctx.fill();
+    } else if (hairStyle === 'long') {
+      /* 마에스트로·데빌 헐크: 어깨 아래까지 흘러내리는 장발 */
+      ctx.beginPath();
+      ctx.moveTo(hx + headR * 0.86, hy - headR * 0.30);
+      ctx.quadraticCurveTo(hx + headR * 0.50, hy - headR * 1.22, hx - headR * 0.32, hy - headR * 1.16);
+      ctx.quadraticCurveTo(hx - headR * 1.16, hy - headR * 1.04, hx - headR * 1.34, hy - headR * 0.22);
+      ctx.quadraticCurveTo(hx - headR * 1.62, hy + headR * 1.10, hx - headR * 1.10, hy + headR * 2.05);
+      ctx.lineTo(hx - headR * 0.86, hy + headR * 1.48);
+      ctx.lineTo(hx - headR * 0.78, hy + headR * 1.98);
+      ctx.lineTo(hx - headR * 0.50, hy + headR * 1.12);
+      ctx.quadraticCurveTo(hx - headR * 0.62, hy - headR * 0.32, hx - headR * 0.22, hy - headR * 0.66);
+      ctx.quadraticCurveTo(hx + headR * 0.24, hy - headR * 0.88, hx + headR * 0.52, hy - headR * 0.42);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      /* 새비지·레드·월드워: 헝클어진 짧은 머리 (레퍼런스) */
+      ctx.beginPath();
+      ctx.moveTo(hx + headR * 0.84, hy - headR * 0.30);
+      ctx.lineTo(hx + headR * 0.60, hy - headR * 0.60);
+      ctx.lineTo(hx + headR * 0.72, hy - headR * 0.90);
+      ctx.lineTo(hx + headR * 0.38, hy - headR * 0.84);
+      ctx.lineTo(hx + headR * 0.44, hy - headR * 1.20);
+      ctx.lineTo(hx + headR * 0.08, hy - headR * 0.98);
+      ctx.lineTo(hx - headR * 0.08, hy - headR * 1.26);
+      ctx.lineTo(hx - headR * 0.42, hy - headR * 1.00);
+      ctx.lineTo(hx - headR * 0.64, hy - headR * 1.20);
+      ctx.lineTo(hx - headR * 0.82, hy - headR * 0.84);
+      ctx.lineTo(hx - headR * 1.02, hy - headR * 0.88);
+      ctx.lineTo(hx - headR * 0.96, hy - headR * 0.34);
+      ctx.lineTo(hx - headR * 1.04, hy + headR * 0.08);
+      ctx.lineTo(hx - headR * 0.78, hy);
+      ctx.lineTo(hx - headR * 0.70, hy + headR * 0.28);
+      ctx.lineTo(hx - headR * 0.50, hy - headR * 0.08);
+      ctx.quadraticCurveTo(hx - headR * 0.1, hy - headR * 0.48, hx + headR * 0.48, hy - headR * 0.36);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (hairStyle !== 'bald') {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(150,132,112,.32)';
+      ctx.lineWidth = outW * 0.42;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(hx - headR * (0.62 - i * 0.34), hy - headR * (0.96 - i * 0.06));
+        ctx.quadraticCurveTo(hx - headR * (0.3 - i * 0.34), hy - headR * (1.06 - i * 0.04),
+                             hx + headR * (0.06 + i * 0.3), hy - headR * (0.86 - i * 0.02));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     /* 눈두덩 그림자 (깊게) */
     const browDrop = attacking ? headR * 0.1 : 0;
     ctx.save();
@@ -7660,12 +7769,12 @@ function drawHulk(){
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const eg = ctx.createRadialGradient(hx + headR * 0.56, eyeY, 1, hx + headR * 0.56, eyeY, headR * 0.26);
-    eg.addColorStop(0, raging ? 'rgba(255,220,90,.8)' : 'rgba(190,255,120,.42)');
-    eg.addColorStop(1, 'rgba(120,255,110,0)');
+    eg.addColorStop(0, hexA(eyeC, raging ? 0.8 : 0.5));
+    eg.addColorStop(1, hexA(eyeC, 0));
     ctx.fillStyle = eg;
     ctx.fillRect(hx + headR * 0.3, eyeY - headR * 0.26, headR * 0.52, headR * 0.52);
     ctx.restore();
-    ctx.fillStyle = raging ? '#ffdc4a' : '#d9f26a';
+    ctx.fillStyle = eyeC;
     ctx.beginPath();
     ctx.moveTo(hx + headR * 0.36, eyeY + headR * 0.05);
     ctx.lineTo(hx + headR * 0.5, eyeY - headR * 0.075);
