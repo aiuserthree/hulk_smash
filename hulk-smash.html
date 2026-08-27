@@ -2959,19 +2959,37 @@ function destroyObj(o, big){
   if (G.combo >= 10 && G.combo % 10 === 0) popup(H.x, GROUND - hulkH() - 60, 'COMBO x' + G.combo + '!!', 30 + Math.min(G.combo, 26), '#ff4b33');
   if (Math.random() < 0.09) spawnDrop(cx + rand(-24, 24));
 
-  addBurst(cx, GROUND - Math.min(o.h * 0.55, 110), isBig ? 110 : 64);
-  spawnSparks(cx, GROUND - Math.min(o.h * 0.4, 80), dir, isBig ? 20 : 12);
-  spawnDebris(o.x, GROUND, o.w, o.h, objDebrisColor(o), isBig ? 45 : 22, isBig ? 560 : 380, dir);
-  spawnDust(cx, GROUND, isBig ? 18 : 8, o.w / 2);
-  impact(isBig ? 0.14 : 0.08);
-  G.camKick += dir * (isBig ? 26 : 14);
-  zoomKick(isBig ? 0.06 : 0.03);
+  const iy = GROUND - Math.min(o.h * 0.5, 130);
+  addBurst(cx, GROUND - Math.min(o.h * 0.55, 110), isBig ? 130 : 76);
+  spawnSparks(cx, GROUND - Math.min(o.h * 0.4, 80), dir, isBig ? 26 : 15);
+  spawnSparks(cx, GROUND - Math.min(o.h * 0.4, 80), -dir, isBig ? 12 : 6);
+  spawnDebris(o.x, GROUND, o.w, o.h, objDebrisColor(o), isBig ? 58 : 28, isBig ? 640 : 430, dir);
+  spawnDust(cx, GROUND, isBig ? 24 : 11, o.w / 2);
+  /* 파괴 섬광: 큰 사물일수록 블룸·광선이 커진다 */
+  addFlare(cx, iy, (isBig ? 1.5 : 0.95) * Math.max(o.w, 70), 'rgba(255,205,120,.82)', isBig ? 0.38 : 0.26);
+  addRays(cx, iy, isBig ? 12 : 8, 'rgba(255,232,170,.9)', (isBig ? 2.4 : 1.5) * Math.max(o.w, 70), isBig ? 0.3 : 0.22);
+  addRing(cx, GROUND, isBig ? 230 : 140, '#ffd23f', isBig ? 6 : 4);
+  /* 지면이 파여 암석이 솟구침 */
+  spawnRocks(cx, isBig ? 12 : 5, o.w * 0.45, isBig ? 660 : 420);
+  addCrack(cx, isBig ? 160 : 90);
+  screenTint('255,200,110', isBig ? 0.4 : 0.2);
+  impact(isBig ? 0.15 : 0.09);
+  G.camKick += dir * (isBig ? 30 : 16);
+  zoomKick(isBig ? 0.07 : 0.035);
 
   if (o.type === 'building' || o.type === 'tower' || o.type === 'crane' || o.type === 'watertank') {
     o.dying = 0.0001; /* 제자리 붕괴 */
     G.emitters.push({ x: cx, y: GROUND - 30, t: 0, life: 1.1, kind: 'rubble', w: o.w });
-    spawnShards(cx, GROUND - o.h * 0.5, 10);
+    spawnShards(cx, GROUND - o.h * 0.5, 14);
     addRubble(cx, o.w);
+    /* 무너지며 피어오르는 먼지 기둥 (층별로 순차 분출) */
+    const floors = Math.max(3, Math.floor(o.h / 90));
+    for (let f = 0; f < floors; f++) {
+      G.emitters.push({ x: cx + rand(-o.w * 0.3, o.w * 0.3), y: GROUND - o.h * ((f + 0.5) / floors),
+                        t: -f * 0.09, life: 0.7, kind: 'rubble', w: o.w * 0.6 });
+    }
+    spawnDust(cx, GROUND - o.h * 0.5, 10, o.w * 0.6);
+    addRays(cx, GROUND - o.h * 0.45, 9, 'rgba(255,240,200,.75)', o.h * 0.8, 0.34);
     if (G.rageT <= 0 && !reducedMotion) G.slowMo = 0.3;
     SND.bigBoom();
   } else {
@@ -3492,6 +3510,7 @@ function updateHurls(dt){
 /* ---------- 업데이트 ---------- */
 function update(dt){
   G.time += dt;
+  const frameStartX = H.x;   /* 이 프레임의 모든 이동을 검사하기 위한 기준 */
 
   autoCast(dt);
 
@@ -3648,31 +3667,8 @@ function update(dt){
   }
 
   if (defeated && H.knockT <= 0) H.vx = 0; /* 쓰러진 채 (마지막 넉백 미끄러짐만 허용) */
-  const prevX = H.x;
   H.x += H.vx * dt;
   H.x = clamp(H.x, 60, G.worldLen - 60);
-  /* 앞을 가로막는 사물: 부수기 전엔 전진 불가 */
-  if (G.total > 0) {
-    const margin = hulkW() * 0.34;
-    let gate = Infinity;
-    for (const o of G.objects) {
-      if (o.hp <= 0 || o.dead) continue;
-      const g = o.x - margin;
-      if (g >= prevX - 2 && g < gate) gate = g;
-    }
-    if (H.x > gate) {
-      H.x = gate;
-      /* 막혔다는 신호: 흙먼지 + 안내 (과하지 않게 간격 제한) */
-      if (H.vx > 0 && G.state === 'play') {
-        G.blockT = (G.blockT || 0) - dt;
-        if (G.blockT <= 0) {
-          G.blockT = 1.6;
-          spawnDust(H.x + hulkW() * 0.4, GROUND, 3, 26);
-          popup(H.x, GROUND - hulkH() - 40, '부수고 지나가라!', 26, '#ffd23f');
-        }
-      }
-    }
-  }
 
   /* 중력 / 점프 / 슬램 */
   if (!H.onGround) {
@@ -4112,6 +4108,35 @@ function update(dt){
 
   /* 구름 */
   for (const c of G.clouds) { c.x += c.v * dt; if (c.x > G.worldLen + 300) c.x = -300; }
+
+  /* 앞을 가로막는 사물: 완전히 부수기 전엔 어떤 수단으로도 전진 불가
+     (걷기·돌진·스톰프·슬램 등 프레임 내 모든 이동을 마친 뒤 최종 검사) */
+  if (G.total > 0 && G.state !== 'clear') {
+    const margin = hulkW() * 0.34;
+    let gate = Infinity;
+    for (const o of G.objects) {
+      if (o.hp > 0 && !o.dead) {
+        const g = o.x - margin;
+        if (g >= frameStartX - 2 && g < gate) gate = g;
+      }
+    }
+    if (H.x > gate) {
+      const pushed = H.x - gate;
+      H.x = gate;
+      if (H.vx > 0) H.vx = 0;
+      if (H.dashT > 0) H.dashT = 0;          /* 벽에 막히면 돌진도 멈춤 */
+      if (H.stompN > 0) H.stompT = Math.max(H.stompT, 0.12);
+      if (G.state === 'play') {
+        G.blockT = (G.blockT || 0) - dt;
+        if (G.blockT <= 0) {
+          G.blockT = 1.4;
+          spawnDust(H.x + hulkW() * 0.42, GROUND, 4, 30);
+          if (pushed > 6) { addRing(H.x + hulkW() * 0.4, GROUND, 90, '#ffd23f', 4); shake(3); }
+          popup(H.x, GROUND - hulkH() - 40, '부수고 지나가라!', 26, '#ffd23f');
+        }
+      }
+    }
+  }
 
   /* 카메라 */
   const targetCam = clamp(H.x - viewW * 0.45, 0, Math.max(0, G.worldLen - viewW));
