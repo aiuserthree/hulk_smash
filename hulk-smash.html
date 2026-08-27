@@ -6881,7 +6881,7 @@ function drawHulk(){
   const jeanF = [[0, '#3f4a72'], [0.5, '#2c3456'], [1, '#1d2440']];
   const jeanB = [[0, '#2c3456'], [0.5, '#232a48'], [1, '#171d34']];
   const outline = 'rgba(20,28,10,.5)';
-  const defLine = 'rgba(46,68,22,.5)'; /* 근육 정의선 */
+  const defLine = 'rgba(24,44,12,.78)'; /* 근육 정의선 — 레퍼런스처럼 깊게 */
   const outW = 2.2 * Math.min(s, 1.4);
 
   ctx.save();
@@ -6963,7 +6963,7 @@ function drawHulk(){
   }
 
   const shYBase = hipY - torsoH * 0.76;
-  function shoulderX(front){ return front ? bodyW * 0.44 : -bodyW * 0.47; }
+  function shoulderX(front){ return front ? bodyW * 0.60 : -bodyW * 0.60; }
 
   /* ---- 다리 ---- */
   function leg(px, phase, front){
@@ -7025,8 +7025,8 @@ function drawHulk(){
       ctx.restore();
     }
     /* 허벅지 청바지 — 허벅지 중간에서 찢겨 근육이 드러남 */
-    const mtx = lerp2(hx, kx, 0.6), mty = lerp2(hy, ky, 0.6);
-    limbG(hx, hy, mtx, mty, thR, knR * 1.5, front ? jeanF : jeanB);
+    const mtx = lerp2(hx, kx, 0.88), mty = lerp2(hy, ky, 0.88);
+    limbG(hx, hy, mtx, mty, thR, knR * 1.32, front ? jeanF : jeanB);
     /* 찢어진 밑단 */
     ctx.fillStyle = front ? '#2c3456' : '#232a48';
     const fx = (r, d) => mtx + Math.sin(sA) * d + Math.cos(sA) * r;
@@ -7088,7 +7088,7 @@ function drawHulk(){
     if (landCr > 0.2) return front ? [0.7, 0.85, 1] : [-0.45, 0.5, 1];
     if (raging && !moving) return front ? [0.8, 1.7, 1] : [-0.7, 1.6, 1];
     if (moving) return front ? [0.35 - swing * 0.85, 1.15, 1] : [0.35 + swing * 0.85, 1.15, 1]; /* 러닝: 굽힌 팔 펌핑 */
-    return front ? [0.20, 0.60, 1] : [-0.40, 0.50, 1];
+    return front ? [0.30, 0.42, 1] : [-0.34, 0.40, 1];
   }
   /* 각진 주먹: 너클 4개 스캘럽 + 손가락 마디선 + 감긴 엄지 */
   function drawFist(x, y, canvasAng, r, front){
@@ -7159,8 +7159,8 @@ function drawHulk(){
     const shX = shoulderX(front);
     const shY = shYBase;
     const upL = armLenU * lm, foL = armLenF * lm;
-    const uR = bodyW * (front ? 0.184 : 0.170);
-    const fR = bodyW * (front ? 0.186 : 0.172);
+    const uR = bodyW * (front ? 0.178 : 0.166);
+    const fR = bodyW * (front ? 0.212 : 0.196);   /* 레퍼런스: 전완이 상완보다 굵다 */
     const wR = bodyW * (front ? 0.14 : 0.125);
     const sk = front ? skinF : skinB;
     const ex = shX + Math.sin(angU) * upL, ey = shY + Math.cos(angU) * upL;
@@ -7242,8 +7242,8 @@ function drawHulk(){
   /* ---- IK 팔: 손을 목표점으로 (합장 박수·해머용) ---- */
   function armTo(front, hxT, hyT, elbowSign, palm){
     const shX = shoulderX(front), shY = shYBase;
-    const uR = bodyW * (front ? 0.184 : 0.170);
-    const fR = bodyW * (front ? 0.186 : 0.172);
+    const uR = bodyW * (front ? 0.178 : 0.166);
+    const fR = bodyW * (front ? 0.212 : 0.196);   /* 레퍼런스: 전완이 상완보다 굵다 */
     const wR = bodyW * (front ? 0.14 : 0.125);
     let dx = hxT - shX, dy = hyT - shY;
     let dist = Math.hypot(dx, dy) || 1;
@@ -7367,8 +7367,8 @@ function drawHulk(){
 
   /* ---- 몸통 (더 넓은 어깨 + 두꺼운 흉근 + 식스팩) ---- */
   function torso(){
-    const hw = bodyW * 0.32, ww = bodyW * 0.35;
-    const lw = bodyW * 0.66, sw = bodyW * 0.6;
+    const hw = bodyW * 0.315, ww = bodyW * 0.305;   /* 잘록한 허리 */
+    const lw = bodyW * 0.70, sw = bodyW * 0.64;    /* 넓은 광배·어깨 */
     const yHip = hipY, yWaist = hipY - torsoH * 0.24;
     const yLat = hipY - torsoH * 0.6, ySh = hipY - torsoH * 0.92;
     const yTrap = ySh - torsoH * 0.19;
@@ -7420,10 +7420,36 @@ function drawHulk(){
     ctx.ellipse(bodyW * 0.2, ySh + torsoH * 0.17, bodyW * 0.28, torsoH * 0.13, -0.08, 0, 7);
     ctx.fill();
     ctx.restore();
+    /* 대흉근 갈라짐: 가운데 깊은 골 + 아랫단 그림자 (면으로 넣어 확실히 보이게) */
+    ctx.save();
+    ctx.fillStyle = 'rgba(24,44,12,.34)';
+    ctx.beginPath();
+    ctx.moveTo(bodyW * 0.10, ySh + torsoH * 0.08);
+    ctx.quadraticCurveTo(bodyW * 0.15, ySh + torsoH * 0.28, bodyW * 0.10, ySh + torsoH * 0.46);
+    ctx.quadraticCurveTo(bodyW * 0.04, ySh + torsoH * 0.28, bodyW * 0.10, ySh + torsoH * 0.08);
+    ctx.closePath(); ctx.fill();
+    /* 흉근 아랫단 그늘 */
+    ctx.beginPath();
+    ctx.moveTo(bodyW * 0.14, ySh + torsoH * 0.42);
+    ctx.quadraticCurveTo(bodyW * 0.36, ySh + torsoH * 0.50, bodyW * 0.50, ySh + torsoH * 0.30);
+    ctx.quadraticCurveTo(bodyW * 0.36, ySh + torsoH * 0.42, bodyW * 0.14, ySh + torsoH * 0.36);
+    ctx.closePath(); ctx.fill();
+    /* 복근 칸 그림자 3단 */
+    for (let r = 0; r < 3; r++) {
+      const yy = ySh + torsoH * (0.60 + r * 0.14);
+      ctx.beginPath();
+      ctx.ellipse(bodyW * 0.02, yy, bodyW * 0.135, torsoH * 0.045, 0, 0, 7);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(bodyW * 0.22, yy - torsoH * 0.005, bodyW * 0.115, torsoH * 0.042, 0, 0, 7);
+      ctx.fill();
+    }
+    ctx.restore();
     /* 근육 정의선: 흉근·흉골·식스팩·광배·상흉근 */
     ctx.save();
     ctx.strokeStyle = defLine;
-    ctx.lineWidth = outW * 0.55;
+    ctx.lineWidth = outW * 0.9;
+    ctx.lineCap = 'round';
     ctx.beginPath();
     /* 가슴 밑선 (양쪽 흉근) */
     ctx.moveTo(-bodyW * 0.1, ySh + torsoH * 0.4);
@@ -7533,9 +7559,9 @@ function drawHulk(){
   function head(){
     const attacking = punchPh > 0 || H.slam || dashing || clapping || raging || H.roarT > 0;
     const hx = bodyW * 0.19, hy = hipY - torsoH * 1.10 - headR * 1.02;
-    /* 굵은 목 */
-    limbG(hx - headR * 0.05, hy + headR * 0.55, hx - headR * 0.15, hy + headR * 1.6,
-          headR * 0.72, headR * 0.9, skinB);
+    /* 목 없음: 승모근이 턱밑까지 차오르는 형태 (레퍼런스) — 짧고 굵은 연결부만 */
+    limbG(hx - headR * 0.10, hy + headR * 0.72, hx - headR * 0.24, hy + headR * 1.18,
+          headR * 0.95, headR * 1.15, skinB);
     /* 두상 + 각진 턱 */
     const hg = ctx.createLinearGradient(hx - headR, hy - headR, hx + headR * 0.7, hy + headR);
     hg.addColorStop(0, P.mid);
@@ -7567,25 +7593,44 @@ function drawHulk(){
     ctx.beginPath();
     ctx.arc(hx - headR * 0.52, hy + headR * 0.18, headR * 0.19, 0, 7);
     ctx.fill();
-    /* 검은 플랫탑 헤어 */
-    ctx.fillStyle = '#1b1815';
+    /* 헝클어진 짧은 흑갈색 머리 (레퍼런스: 삐죽삐죽한 실루엣, 관자놀이까지 덮음) */
+    const hairG = ctx.createLinearGradient(hx - headR, hy - headR * 1.2, hx + headR * 0.6, hy);
+    hairG.addColorStop(0, '#2b241d');
+    hairG.addColorStop(0.55, '#1e1813');
+    hairG.addColorStop(1, '#12100d');
+    ctx.fillStyle = hairG;
     ctx.beginPath();
-    ctx.moveTo(hx + headR * 0.7, hy - headR * 0.52);
-    ctx.lineTo(hx + headR * 0.62, hy - headR * 1.12);
-    ctx.lineTo(hx - headR * 0.72, hy - headR * 1.18);
-    ctx.lineTo(hx - headR * 0.92, hy - headR * 0.2);
-    ctx.lineTo(hx - headR * 0.62, hy - headR * 0.32);
-    ctx.quadraticCurveTo(hx - headR * 0.1, hy - headR * 0.58, hx + headR * 0.4, hy - headR * 0.58);
+    ctx.moveTo(hx + headR * 0.86, hy - headR * 0.30);          /* 이마 앞머리 시작 */
+    ctx.lineTo(hx + headR * 0.62, hy - headR * 0.58);
+    ctx.lineTo(hx + headR * 0.74, hy - headR * 0.86);          /* 삐친 앞머리 */
+    ctx.lineTo(hx + headR * 0.40, hy - headR * 0.80);
+    ctx.lineTo(hx + headR * 0.46, hy - headR * 1.16);
+    ctx.lineTo(hx + headR * 0.10, hy - headR * 0.94);
+    ctx.lineTo(hx - headR * 0.06, hy - headR * 1.24);
+    ctx.lineTo(hx - headR * 0.40, hy - headR * 0.98);
+    ctx.lineTo(hx - headR * 0.62, hy - headR * 1.18);
+    ctx.lineTo(hx - headR * 0.80, hy - headR * 0.82);
+    ctx.lineTo(hx - headR * 1.04, hy - headR * 0.86);
+    ctx.lineTo(hx - headR * 0.98, hy - headR * 0.34);          /* 뒤통수 */
+    ctx.lineTo(hx - headR * 1.06, hy + headR * 0.10);
+    ctx.lineTo(hx - headR * 0.80, hy + headR * 0.02);
+    ctx.lineTo(hx - headR * 0.72, hy + headR * 0.30);          /* 구레나룻 */
+    ctx.lineTo(hx - headR * 0.52, hy - headR * 0.06);
+    ctx.quadraticCurveTo(hx - headR * 0.1, hy - headR * 0.46, hx + headR * 0.5, hy - headR * 0.34);
     ctx.closePath();
     ctx.fill();
-    /* 플랫탑 윗면 하이라이트 */
+    /* 머리결 하이라이트 몇 가닥 */
     ctx.save();
-    ctx.strokeStyle = 'rgba(110,100,90,.4)';
-    ctx.lineWidth = outW * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(hx - headR * 0.66, hy - headR * 1.1);
-    ctx.lineTo(hx + headR * 0.56, hy - headR * 1.05);
-    ctx.stroke();
+    ctx.strokeStyle = 'rgba(150,132,112,.35)';
+    ctx.lineWidth = outW * 0.42;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(hx - headR * (0.62 - i * 0.34), hy - headR * (0.96 - i * 0.06));
+      ctx.quadraticCurveTo(hx - headR * (0.3 - i * 0.34), hy - headR * (1.06 - i * 0.04),
+                           hx + headR * (0.06 + i * 0.3), hy - headR * (0.86 - i * 0.02));
+      ctx.stroke();
+    }
     ctx.restore();
     /* 눈두덩 그림자 (깊게) */
     const browDrop = attacking ? headR * 0.1 : 0;
