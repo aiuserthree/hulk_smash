@@ -7384,10 +7384,15 @@ function drawHulk(){
     tg.addColorStop(1, P.hi);
     ctx.fillStyle = tg;
     ctx.beginPath();
+    /* 등: 골반→광배→어깨를 꺾이는 점 없이 하나의 곡선으로 (뾰족하게 솟던 등 제거) */
+    const bkX = -sw * 0.72, bkY = ySh + torsoH * 0.12;
+    const bkCx = -lw * 0.94, bkCy = yLat + torsoH * 0.02;
     ctx.moveTo(-hw, yHip + 6 * s);
-    ctx.quadraticCurveTo(-ww * 1.08, yWaist, -lw, yLat);
-    ctx.quadraticCurveTo(-lw * 1.08, ySh + torsoH * 0.1, -sw * 0.92, ySh);
-    ctx.quadraticCurveTo(-bodyW * 0.10, yTrap + torsoH * 0.02, bodyW * 0.16, yTrap + torsoH * 0.03);
+    ctx.bezierCurveTo(-ww * 1.10, yWaist, bkCx, bkCy, bkX, bkY);
+    /* 앞 제어점을 직전 곡선 접선의 연장선에 두어 어깨 이음매까지 매끄럽게 */
+    ctx.bezierCurveTo(bkX + (bkX - bkCx) * 0.5, bkY + (bkY - bkCy) * 0.5,
+                      -bodyW * 0.20, yTrap + torsoH * 0.08,
+                      bodyW * 0.16, yTrap + torsoH * 0.03);
     ctx.quadraticCurveTo(bodyW * 0.44, yTrap + torsoH * 0.05, sw, ySh + torsoH * 0.04);
     ctx.quadraticCurveTo(lw * 1.06, ySh + torsoH * 0.3, ww * 1.02, yWaist);
     ctx.quadraticCurveTo(hw * 1.04, yHip - 4 * s, hw, yHip + 6 * s);
