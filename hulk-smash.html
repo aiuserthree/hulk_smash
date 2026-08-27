@@ -204,6 +204,58 @@
   }
   .ctrl-grid .locked-row{opacity:.45}
 
+  #ctrlNote{display:none;font-size:10.5px;font-weight:900;color:#8a8270;margin-bottom:8px;line-height:1.3}
+
+  /* ---------- 스킨 해금 배너 ---------- */
+  #skinUnlock{display:none;margin:0 auto 10px;max-width:340px;
+    border:3px solid var(--ink);border-radius:12px;background:#fff6d8;
+    box-shadow:4px 4px 0 var(--ink);padding:8px 12px;
+    font-size:13px;font-weight:900;color:#7a5a10;line-height:1.35;
+    animation:statPop .5s backwards .3s}
+  #skinUnlock.on{display:block}
+  #skinUnlock b{color:var(--green-dk);font-size:15px}
+  #skinUnlock small{font-size:10.5px;color:#9a8a5a;font-weight:900}
+  #skinUnlock .dot{display:inline-block;width:14px;height:14px;border-radius:50%;
+    border:2px solid var(--ink);vertical-align:-2px;margin-right:5px}
+  @media (max-height: 500px){ #skinUnlock{padding:5px 9px;font-size:11px;margin-bottom:6px} }
+
+  /* ---------- 헐크 스킨 선택 ---------- */
+  #skinWrap{margin-top:14px}
+  #skinTitle{font-size:12px;font-weight:900;color:#6a6350;margin-bottom:7px;letter-spacing:1px}
+  #skinRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .skinChip{
+    position:relative;cursor:pointer;user-select:none;
+    border:3px solid var(--ink);border-radius:12px;background:#fff;
+    padding:6px 9px 5px;min-width:66px;text-align:center;
+    box-shadow:3px 3px 0 var(--ink);transition:transform .1s;
+  }
+  .skinChip:hover{transform:translate(-1px,-1px)}
+  .skinChip .dot{
+    width:26px;height:26px;border-radius:50%;margin:0 auto 4px;
+    border:2.5px solid var(--ink);
+  }
+  .skinChip .nm{font-size:10.5px;font-weight:900;color:#4c4636;line-height:1.15}
+  .skinChip.sel{background:#e9f7e4;box-shadow:3px 3px 0 var(--green-dk),0 0 0 3px var(--green) inset}
+  .skinChip.lock{opacity:.55;cursor:not-allowed}
+  .skinChip.lock .dot{filter:grayscale(1)}
+  .skinChip .need{font-size:9px;font-weight:900;color:#a3703c;margin-top:2px;line-height:1.1}
+  #recLine{margin-top:10px;font-size:11.5px;font-weight:900;color:#6a6350}
+  #recLine b{color:var(--green-dk)}
+  @media (max-height: 500px){
+    /* 가로: 잠긴 스킬 설명을 한 줄 요약으로 접어 시작 화면 높이 확보 */
+    #startOv .ctrl-grid .locked-row, #startOv .ctrl-grid .kb.locked{display:none}
+    #ctrlNote{display:block}
+    #startOv .panel{padding:8px 18px}
+    #startOv .sub{margin-bottom:6px}
+    #skinWrap{margin-top:8px}
+    #skinTitle{font-size:10px;margin-bottom:4px}
+    .skinChip{padding:4px 6px 3px;min-width:52px}
+    .skinChip .dot{width:18px;height:18px;margin-bottom:2px}
+    .skinChip .nm{font-size:9px}
+    .skinChip .need{font-size:8px}
+    #recLine{margin-top:6px;font-size:10px}
+  }
+
   /* ---------- 클리어 화면 ---------- */
   /* 뒤에서 회전하는 황금 광선 */
   #clearOv .sunburst{
@@ -567,11 +619,17 @@
         <span class="kb locked">B</span><span class="locked-row">낙뢰 폭풍 — STAGE 6 해제</span>
         <span class="kb locked">Q·E·F·T·G</span><span class="locked-row">보스 격파 보상 스킬 (계속 누적!)</span>
       </div>
+      <div id="ctrlNote">X·C·V·R·B 스킬은 STAGE 2~6에서 차례로 해제 · Q·E·F·T·G는 보스 격파 보상</div>
       <div id="startBtns" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
         <button class="bigbtn" id="continueBtn" style="display:none">이어하기</button>
         <button class="bigbtn" id="startBtn">부수러 가기!</button>
       </div>
       <div id="saveInfo" style="display:none;margin-top:10px;font-size:12px;font-weight:700;color:#6a6350"></div>
+      <div id="skinWrap">
+        <div id="skinTitle">💚 헐크 스킨</div>
+        <div id="skinRow"></div>
+        <div id="recLine"></div>
+      </div>
       <div style="margin-top:14px;font-size:12px;font-weight:700;color:#8a8270">P 일시정지 · M 음소거</div>
     </div>
   </div>
@@ -593,6 +651,7 @@
       <div id="upgradeHead">⚡ 강화 보상 — 고르면 즉시 적용!</div>
       <div id="upgradeRow"></div>
       <div id="growthMsg">💪 헐크가 더 커졌다! 파워 상승!</div>
+      <div id="skinUnlock"></div>
       <button class="bigbtn" id="nextBtn">다음 동네 부수러 →</button>
     </div>
   </div>
@@ -1822,6 +1881,69 @@ function genStage(n){
   updateSkillLocks();
 }
 
+/* ---------- 헐크 스킨 + 영구 기록 ---------- */
+const SKINS = [
+  { id: 'green', name: '클래식 그린', need: null,
+    sw: '#65c148', P: { hi:'#b2e56c', base:'#65c148', mid:'#419e34', dark:'#2c7c25', deep:'#1d5619' } },
+  { id: 'grey',  name: '그레이 헐크', need: { smash: 300 },
+    sw: '#98a0ae', P: { hi:'#dfe3ea', base:'#98a0ae', mid:'#6f7886', dark:'#4b5260', deep:'#323844' } },
+  { id: 'blue',  name: '딥 블루',    need: { stage: 8 },
+    sw: '#3f8fd6', P: { hi:'#9ddaff', base:'#3f8fd6', mid:'#2b6aa8', dark:'#1c4a7a', deep:'#12314f' } },
+  { id: 'gold',  name: '골드 헐크',   need: { smash: 1200 },
+    sw: '#e0b23c', P: { hi:'#ffeaa6', base:'#e0b23c', mid:'#b88a22', dark:'#8a6416', deep:'#5c410d' } },
+  { id: 'neon',  name: '네온 퍼플',   need: { stage: 15 },
+    sw: '#a55ce0', P: { hi:'#e8bcff', base:'#a55ce0', mid:'#7d3cb8', dark:'#5a2688', deep:'#3a1559' } },
+];
+const REC_KEY = 'hulkSmash.records.v1';
+let RECORDS = { smash: 0, stage: 1, score: 0, combo: 0, skin: 'green' };
+function loadRecords(){
+  try {
+    const raw = localStorage.getItem(REC_KEY);
+    if (!raw) return;
+    const r = JSON.parse(raw);
+    if (!r || typeof r !== 'object') return;
+    for (const k of ['smash', 'stage', 'score', 'combo']) {
+      const v = Math.floor(r[k]);
+      if (v >= 0 && v < 1e12) RECORDS[k] = v;
+    }
+    if (SKINS.some(sk => sk.id === r.skin)) RECORDS.skin = r.skin;
+  } catch (_) {}
+}
+function saveRecords(){
+  try { localStorage.setItem(REC_KEY, JSON.stringify(RECORDS)); } catch (_) {}
+}
+function skinUnlocked(sk){
+  if (!sk.need) return true;
+  if (sk.need.smash != null && RECORDS.smash >= sk.need.smash) return true;
+  if (sk.need.stage != null && RECORDS.stage >= sk.need.stage) return true;
+  return false;
+}
+function skinNeedText(sk){
+  if (!sk.need) return '';
+  if (sk.need.smash != null) return '누적 ' + sk.need.smash.toLocaleString() + '개 파괴';
+  return 'STAGE ' + sk.need.stage + ' 도달';
+}
+function currentSkin(){
+  const sk = SKINS.find(k => k.id === RECORDS.skin) || SKINS[0];
+  return skinUnlocked(sk) ? sk : SKINS[0];
+}
+/* 기록 갱신 — 새로 해금된 스킨이 있으면 알림 */
+function bumpRecords(){
+  const before = SKINS.filter(skinUnlocked).length;
+  RECORDS.smash += G.stageDestroyed;
+  RECORDS.stage = Math.max(RECORDS.stage, G.stage);
+  RECORDS.score = Math.max(RECORDS.score, G.score);
+  RECORDS.combo = Math.max(RECORDS.combo, G.maxCombo);
+  saveRecords();
+  const after = SKINS.filter(skinUnlocked);
+  if (after.length > before) {
+    const fresh = after[after.length - 1];
+    return fresh;
+  }
+  return null;
+}
+loadRecords();
+
 /* ---------- 진행 저장 (스테이지 단위 자동 저장) ---------- */
 const SAVE_KEY = 'hulkSmash.save.v1';
 function saveProgress(){
@@ -1851,8 +1973,35 @@ function loadProgress(){
 function clearProgress(){
   try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
 }
+/* 시작 화면: 스킨 목록 + 최고 기록 */
+function renderSkins(){
+  const row = document.getElementById('skinRow');
+  if (!row) return;
+  row.innerHTML = '';
+  for (const sk of SKINS) {
+    const on = skinUnlocked(sk);
+    const el = document.createElement('div');
+    el.className = 'skinChip' + (on ? '' : ' lock') + (RECORDS.skin === sk.id && on ? ' sel' : '');
+    el.innerHTML = '<div class="dot" style="background:' + sk.sw + '"></div>'
+      + '<div class="nm">' + sk.name + '</div>'
+      + (on ? '' : '<div class="need">🔒 ' + skinNeedText(sk) + '</div>');
+    if (on) el.addEventListener('click', () => {
+      RECORDS.skin = sk.id;
+      saveRecords();
+      renderSkins();
+      SND.unlock();
+    });
+    row.appendChild(el);
+  }
+  const rec = document.getElementById('recLine');
+  if (rec) {
+    rec.innerHTML = '누적 파괴 <b>' + RECORDS.smash.toLocaleString() + '</b>개 · 최고 <b>STAGE '
+      + RECORDS.stage + '</b> · 최고 점수 <b>' + RECORDS.score.toLocaleString() + '</b>';
+  }
+}
 /* 시작 화면: 저장된 진행이 있으면 이어하기 버튼 노출 */
 function refreshStartScreen(){
+  renderSkins();
   const s = loadProgress();
   const btn = $('continueBtn'), info = $('saveInfo'), start = $('startBtn');
   if (s && s.stage >= 2) {
@@ -4416,6 +4565,19 @@ function showClear(){
   ui.growthMsg.textContent = G.stage < 10
     ? '💪 헐크가 더 커졌다! 덩치 +11%, 파워 UP!'
     : '💪 파워가 더 강해졌다!';
+  /* 영구 기록 갱신 → 새 스킨 해금 시 알림 */
+  const fresh = bumpRecords();
+  const unlockBox = document.getElementById('skinUnlock');
+  if (unlockBox) {
+    if (fresh) {
+      unlockBox.classList.add('on');
+      unlockBox.innerHTML = '<span class="dot" style="background:' + fresh.sw + '"></span>'
+        + '새 스킨 해금! <b>' + fresh.name + '</b><br><small>시작 화면에서 바꿀 수 있다</small>';
+      setTimeout(() => SND.fanfare(), 700);
+    } else {
+      unlockBox.classList.remove('on');
+    }
+  }
   ui.clearOv.classList.add('on');
 }
 
@@ -6543,7 +6705,7 @@ function drawHulk(){
   /* 무비풍 올리브 그린 5톤 — 분노 변신 시 레드 헐크 */
   const P = raging
     ? { hi:'#ff9d5e', base:'#d43a26', mid:'#a5231a', dark:'#761410', deep:'#4a0b09' }
-    : { hi:'#b2e56c', base:'#65c148', mid:'#419e34', dark:'#2c7c25', deep:'#1d5619' };
+    : currentSkin().P;
   const skinF = [[0, P.hi], [0.42, P.base], [1, P.dark]];
   const skinB = [[0, P.base], [0.42, P.mid], [1, P.deep]];
   const jeanF = [[0, '#3f4a72'], [0.5, '#2c3456'], [1, '#1d2440']];
