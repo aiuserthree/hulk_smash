@@ -6881,7 +6881,7 @@ function drawHulk(){
   const jeanF = [[0, '#3f4a72'], [0.5, '#2c3456'], [1, '#1d2440']];
   const jeanB = [[0, '#2c3456'], [0.5, '#232a48'], [1, '#171d34']];
   const outline = 'rgba(20,28,10,.5)';
-  const defLine = 'rgba(24,44,12,.78)'; /* 근육 정의선 — 레퍼런스처럼 깊게 */
+  const defLine = 'rgba(46,68,22,.5)'; /* 근육 정의선 */
   const outW = 2.2 * Math.min(s, 1.4);
 
   ctx.save();
@@ -6935,12 +6935,12 @@ function drawHulk(){
   const airTuck = !H.onGround ? 1 - Math.min(1, Math.abs(H.vy) / 700) : 0;
 
   /* 초근육질 체형: 넓은 어깨, 굵은 전완, 짧고 굵은 다리 */
-  const legH = bodyH * 0.455;
-  const torsoH = bodyH * 0.445;
-  const headR = bodyH * 0.113;
+  const legH = bodyH * 0.42;
+  const torsoH = bodyH * 0.48;
+  const headR = bodyH * 0.092;
   const hipY = -legH - bob * 0.4 + landCr * 15 * s;
   const thighL = legH * 0.52, shinL = legH * 0.52;
-  const armLenU = bodyH * 0.255, armLenF = bodyH * 0.245; /* 상완≈전완, 손이 허벅지 중간에 오는 길이 */
+  const armLenU = bodyH * 0.30, armLenF = bodyH * 0.31; /* 긴 팔 (너클워커 체형) */
 
   let lean = 0;
   if (dashing) lean = 0.3;
@@ -6963,7 +6963,7 @@ function drawHulk(){
   }
 
   const shYBase = hipY - torsoH * 0.76;
-  function shoulderX(front){ return front ? bodyW * 0.60 : -bodyW * 0.60; }
+  function shoulderX(front){ return front ? bodyW * 0.40 : -bodyW * 0.38; }
 
   /* ---- 다리 ---- */
   function leg(px, phase, front){
@@ -6996,7 +6996,7 @@ function drawHulk(){
     const kx = hx + Math.sin(thA) * thighL, ky = hy + Math.cos(thA) * thighL;
     const sA = thA - knee;
     const ax = kx + Math.sin(sA) * shinL, ay = ky + Math.cos(sA) * shinL;
-    const thR = bodyW * 0.255, knR = bodyW * 0.15, caR = bodyW * 0.195, anR = bodyW * 0.118;
+    const thR = bodyW * 0.24, knR = bodyW * 0.145, caR = bodyW * 0.19, anR = bodyW * 0.1;
     /* 종아리 */
     limbG(kx, ky, ax, ay, caR, anR, front ? skinF : skinB);
     /* 발 */
@@ -7024,13 +7024,12 @@ function drawHulk(){
       }
       ctx.restore();
     }
-    /* 허벅지 청바지 — 허벅지 중간에서 찢겨 근육이 드러남 */
-    const mtx = lerp2(hx, kx, 0.88), mty = lerp2(hy, ky, 0.88);
-    limbG(hx, hy, mtx, mty, thR, knR * 1.32, front ? jeanF : jeanB);
+    /* 허벅지 청바지 */
+    limbG(hx, hy, kx, ky, thR, knR * 1.25, front ? jeanF : jeanB);
     /* 찢어진 밑단 */
     ctx.fillStyle = front ? '#2c3456' : '#232a48';
-    const fx = (r, d) => mtx + Math.sin(sA) * d + Math.cos(sA) * r;
-    const fy = (r, d) => mty + Math.cos(sA) * d - Math.sin(sA) * r;
+    const fx = (r, d) => kx + Math.sin(sA) * d + Math.cos(sA) * r;
+    const fy = (r, d) => ky + Math.cos(sA) * d - Math.sin(sA) * r;
     ctx.beginPath();
     ctx.moveTo(fx(-knR * 1.2, 0), fy(-knR * 1.2, 0));
     ctx.lineTo(fx(-knR * 0.55, knR * 1.35), fy(-knR * 0.55, knR * 1.35));
@@ -7088,7 +7087,7 @@ function drawHulk(){
     if (landCr > 0.2) return front ? [0.7, 0.85, 1] : [-0.45, 0.5, 1];
     if (raging && !moving) return front ? [0.8, 1.7, 1] : [-0.7, 1.6, 1];
     if (moving) return front ? [0.35 - swing * 0.85, 1.15, 1] : [0.35 + swing * 0.85, 1.15, 1]; /* 러닝: 굽힌 팔 펌핑 */
-    return front ? [0.30, 0.42, 1] : [-0.34, 0.40, 1];
+    return front ? [0.3, 0.36, 1] : [-0.38, 0.32, 1];
   }
   /* 각진 주먹: 너클 4개 스캘럽 + 손가락 마디선 + 감긴 엄지 */
   function drawFist(x, y, canvasAng, r, front){
@@ -7159,8 +7158,8 @@ function drawHulk(){
     const shX = shoulderX(front);
     const shY = shYBase;
     const upL = armLenU * lm, foL = armLenF * lm;
-    const uR = bodyW * (front ? 0.178 : 0.166);
-    const fR = bodyW * (front ? 0.212 : 0.196);   /* 레퍼런스: 전완이 상완보다 굵다 */
+    const uR = bodyW * (front ? 0.185 : 0.165);
+    const fR = bodyW * (front ? 0.21 : 0.185);
     const wR = bodyW * (front ? 0.14 : 0.125);
     const sk = front ? skinF : skinB;
     const ex = shX + Math.sin(angU) * upL, ey = shY + Math.cos(angU) * upL;
@@ -7208,7 +7207,7 @@ function drawHulk(){
       ctx.restore();
     }
     /* 각진 주먹 */
-    const fiR = bodyW * (front ? 0.168 : 0.152);
+    const fiR = bodyW * (front ? 0.2 : 0.18);
     const fcx = wx + Math.sin(aF) * fiR * 0.55, fcy = wy + Math.cos(aF) * fiR * 0.55;
     drawFist(fcx, fcy, Math.atan2(Math.cos(aF), Math.sin(aF)), fiR, front);
     /* 휘두르는 팔 잔상 */
@@ -7242,8 +7241,8 @@ function drawHulk(){
   /* ---- IK 팔: 손을 목표점으로 (합장 박수·해머용) ---- */
   function armTo(front, hxT, hyT, elbowSign, palm){
     const shX = shoulderX(front), shY = shYBase;
-    const uR = bodyW * (front ? 0.178 : 0.166);
-    const fR = bodyW * (front ? 0.212 : 0.196);   /* 레퍼런스: 전완이 상완보다 굵다 */
+    const uR = bodyW * (front ? 0.185 : 0.165);
+    const fR = bodyW * (front ? 0.21 : 0.185);
     const wR = bodyW * (front ? 0.14 : 0.125);
     let dx = hxT - shX, dy = hyT - shY;
     let dist = Math.hypot(dx, dy) || 1;
@@ -7263,7 +7262,7 @@ function drawHulk(){
     limbG(ex, ey, hx3, hy3, fR, wR, sk);
     deltoid(front, shX, shY);
     /* 손: 합장은 손바닥(손가락 골), 해머는 각진 주먹 */
-    const fiR = bodyW * (front ? 0.168 : 0.152);
+    const fiR = bodyW * (front ? 0.2 : 0.18);
     const ha = Math.atan2(hy3 - ey, hx3 - ex);
     if (palm) {
       ctx.save();
@@ -7367,11 +7366,11 @@ function drawHulk(){
 
   /* ---- 몸통 (더 넓은 어깨 + 두꺼운 흉근 + 식스팩) ---- */
   function torso(){
-    const hw = bodyW * 0.315, ww = bodyW * 0.305;   /* 잘록한 허리 */
-    const lw = bodyW * 0.70, sw = bodyW * 0.64;    /* 넓은 광배·어깨 */
+    const hw = bodyW * 0.32, ww = bodyW * 0.35;
+    const lw = bodyW * 0.66, sw = bodyW * 0.6;
     const yHip = hipY, yWaist = hipY - torsoH * 0.24;
     const yLat = hipY - torsoH * 0.6, ySh = hipY - torsoH * 0.92;
-    const yTrap = ySh - torsoH * 0.19;
+    const yTrap = ySh - torsoH * 0.28;
     const tg = ctx.createLinearGradient(-lw, 0, lw * 0.9, 0);
     tg.addColorStop(0, P.deep);
     tg.addColorStop(0.3, P.mid);
@@ -7420,36 +7419,10 @@ function drawHulk(){
     ctx.ellipse(bodyW * 0.2, ySh + torsoH * 0.17, bodyW * 0.28, torsoH * 0.13, -0.08, 0, 7);
     ctx.fill();
     ctx.restore();
-    /* 대흉근 갈라짐: 가운데 깊은 골 + 아랫단 그림자 (면으로 넣어 확실히 보이게) */
-    ctx.save();
-    ctx.fillStyle = 'rgba(24,44,12,.34)';
-    ctx.beginPath();
-    ctx.moveTo(bodyW * 0.10, ySh + torsoH * 0.08);
-    ctx.quadraticCurveTo(bodyW * 0.15, ySh + torsoH * 0.28, bodyW * 0.10, ySh + torsoH * 0.46);
-    ctx.quadraticCurveTo(bodyW * 0.04, ySh + torsoH * 0.28, bodyW * 0.10, ySh + torsoH * 0.08);
-    ctx.closePath(); ctx.fill();
-    /* 흉근 아랫단 그늘 */
-    ctx.beginPath();
-    ctx.moveTo(bodyW * 0.14, ySh + torsoH * 0.42);
-    ctx.quadraticCurveTo(bodyW * 0.36, ySh + torsoH * 0.50, bodyW * 0.50, ySh + torsoH * 0.30);
-    ctx.quadraticCurveTo(bodyW * 0.36, ySh + torsoH * 0.42, bodyW * 0.14, ySh + torsoH * 0.36);
-    ctx.closePath(); ctx.fill();
-    /* 복근 칸 그림자 3단 */
-    for (let r = 0; r < 3; r++) {
-      const yy = ySh + torsoH * (0.60 + r * 0.14);
-      ctx.beginPath();
-      ctx.ellipse(bodyW * 0.02, yy, bodyW * 0.135, torsoH * 0.045, 0, 0, 7);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(bodyW * 0.22, yy - torsoH * 0.005, bodyW * 0.115, torsoH * 0.042, 0, 0, 7);
-      ctx.fill();
-    }
-    ctx.restore();
     /* 근육 정의선: 흉근·흉골·식스팩·광배·상흉근 */
     ctx.save();
     ctx.strokeStyle = defLine;
-    ctx.lineWidth = outW * 0.9;
-    ctx.lineCap = 'round';
+    ctx.lineWidth = outW * 0.55;
     ctx.beginPath();
     /* 가슴 밑선 (양쪽 흉근) */
     ctx.moveTo(-bodyW * 0.1, ySh + torsoH * 0.4);
@@ -7558,10 +7531,10 @@ function drawHulk(){
   /* ---- 머리 ---- */
   function head(){
     const attacking = punchPh > 0 || H.slam || dashing || clapping || raging || H.roarT > 0;
-    const hx = bodyW * 0.19, hy = hipY - torsoH * 1.10 - headR * 1.02;
-    /* 목 없음: 승모근이 턱밑까지 차오르는 형태 (레퍼런스) — 짧고 굵은 연결부만 */
-    limbG(hx - headR * 0.10, hy + headR * 0.72, hx - headR * 0.24, hy + headR * 1.18,
-          headR * 0.95, headR * 1.15, skinB);
+    const hx = bodyW * 0.19, hy = hipY - torsoH * 1.08 - headR * 0.7;
+    /* 목이 보이지 않는 형태: 승모근이 턱밑까지 차오름 (레퍼런스) */
+    limbG(hx - headR * 0.08, hy + headR * 0.68, hx - headR * 0.20, hy + headR * 1.15,
+          headR * 0.92, headR * 1.12, skinB);
     /* 두상 + 각진 턱 */
     const hg = ctx.createLinearGradient(hx - headR, hy - headR, hx + headR * 0.7, hy + headR);
     hg.addColorStop(0, P.mid);
@@ -7593,35 +7566,34 @@ function drawHulk(){
     ctx.beginPath();
     ctx.arc(hx - headR * 0.52, hy + headR * 0.18, headR * 0.19, 0, 7);
     ctx.fill();
-    /* 헝클어진 짧은 흑갈색 머리 (레퍼런스: 삐죽삐죽한 실루엣, 관자놀이까지 덮음) */
+    /* 헝클어진 짧은 흑갈색 머리 (레퍼런스) */
     const hairG = ctx.createLinearGradient(hx - headR, hy - headR * 1.2, hx + headR * 0.6, hy);
     hairG.addColorStop(0, '#2b241d');
     hairG.addColorStop(0.55, '#1e1813');
     hairG.addColorStop(1, '#12100d');
     ctx.fillStyle = hairG;
     ctx.beginPath();
-    ctx.moveTo(hx + headR * 0.86, hy - headR * 0.30);          /* 이마 앞머리 시작 */
-    ctx.lineTo(hx + headR * 0.62, hy - headR * 0.58);
-    ctx.lineTo(hx + headR * 0.74, hy - headR * 0.86);          /* 삐친 앞머리 */
-    ctx.lineTo(hx + headR * 0.40, hy - headR * 0.80);
-    ctx.lineTo(hx + headR * 0.46, hy - headR * 1.16);
-    ctx.lineTo(hx + headR * 0.10, hy - headR * 0.94);
-    ctx.lineTo(hx - headR * 0.06, hy - headR * 1.24);
-    ctx.lineTo(hx - headR * 0.40, hy - headR * 0.98);
-    ctx.lineTo(hx - headR * 0.62, hy - headR * 1.18);
-    ctx.lineTo(hx - headR * 0.80, hy - headR * 0.82);
-    ctx.lineTo(hx - headR * 1.04, hy - headR * 0.86);
-    ctx.lineTo(hx - headR * 0.98, hy - headR * 0.34);          /* 뒤통수 */
-    ctx.lineTo(hx - headR * 1.06, hy + headR * 0.10);
-    ctx.lineTo(hx - headR * 0.80, hy + headR * 0.02);
-    ctx.lineTo(hx - headR * 0.72, hy + headR * 0.30);          /* 구레나룻 */
-    ctx.lineTo(hx - headR * 0.52, hy - headR * 0.06);
-    ctx.quadraticCurveTo(hx - headR * 0.1, hy - headR * 0.46, hx + headR * 0.5, hy - headR * 0.34);
+    ctx.moveTo(hx + headR * 0.84, hy - headR * 0.30);
+    ctx.lineTo(hx + headR * 0.60, hy - headR * 0.60);
+    ctx.lineTo(hx + headR * 0.72, hy - headR * 0.90);
+    ctx.lineTo(hx + headR * 0.38, hy - headR * 0.84);
+    ctx.lineTo(hx + headR * 0.44, hy - headR * 1.20);
+    ctx.lineTo(hx + headR * 0.08, hy - headR * 0.98);
+    ctx.lineTo(hx - headR * 0.08, hy - headR * 1.26);
+    ctx.lineTo(hx - headR * 0.42, hy - headR * 1.00);
+    ctx.lineTo(hx - headR * 0.64, hy - headR * 1.20);
+    ctx.lineTo(hx - headR * 0.82, hy - headR * 0.84);
+    ctx.lineTo(hx - headR * 1.02, hy - headR * 0.88);
+    ctx.lineTo(hx - headR * 0.96, hy - headR * 0.34);
+    ctx.lineTo(hx - headR * 1.04, hy + headR * 0.08);
+    ctx.lineTo(hx - headR * 0.78, hy);
+    ctx.lineTo(hx - headR * 0.70, hy + headR * 0.28);
+    ctx.lineTo(hx - headR * 0.50, hy - headR * 0.08);
+    ctx.quadraticCurveTo(hx - headR * 0.1, hy - headR * 0.48, hx + headR * 0.48, hy - headR * 0.36);
     ctx.closePath();
     ctx.fill();
-    /* 머리결 하이라이트 몇 가닥 */
     ctx.save();
-    ctx.strokeStyle = 'rgba(150,132,112,.35)';
+    ctx.strokeStyle = 'rgba(150,132,112,.32)';
     ctx.lineWidth = outW * 0.42;
     ctx.lineCap = 'round';
     for (let i = 0; i < 3; i++) {
@@ -7760,9 +7732,9 @@ function drawHulk(){
 
   /* ---- 순서: 뒤팔 → 뒷다리 → 몸통·머리 → 앞다리 → 앞팔 ---- */
   rotated(() => { if (!useHands) arm(false); });
-  leg(-bodyW * 0.215, Math.PI, false);
+  leg(-bodyW * 0.17, Math.PI, false);
   rotated(() => { torso(); head(); });
-  leg(bodyW * 0.215, 0, true);
+  leg(bodyW * 0.17, 0, true);
   rotated(() => {
     if (useHands) drawBothHands();
     else arm(true);
