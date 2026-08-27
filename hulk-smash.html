@@ -205,6 +205,48 @@
   .ctrl-grid .locked-row{opacity:.45}
 
   /* ---------- 클리어 화면 ---------- */
+  /* 뒤에서 회전하는 황금 광선 */
+  #clearOv .sunburst{
+    position:absolute;left:50%;top:50%;width:190vmax;height:190vmax;
+    margin:-95vmax 0 0 -95vmax;pointer-events:none;
+    background:repeating-conic-gradient(from 0deg,
+      rgba(255,210,63,.22) 0deg 7deg, rgba(255,210,63,0) 7deg 18deg);
+    animation:sunspin 14s linear infinite;
+  }
+  @keyframes sunspin{to{transform:rotate(360deg)}}
+  #clearOv .glowpulse{
+    position:absolute;left:50%;top:50%;width:120vmax;height:120vmax;
+    margin:-60vmax 0 0 -60vmax;pointer-events:none;
+    background:radial-gradient(circle, rgba(255,220,120,.35), rgba(255,190,60,0) 62%);
+    animation:glowpulse 2.6s ease-in-out infinite;
+  }
+  @keyframes glowpulse{0%,100%{transform:scale(.92);opacity:.75}50%{transform:scale(1.06);opacity:1}}
+  /* 떨어지는 색종이 */
+  #clearOv .confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  #clearOv .confetti i{
+    position:absolute;top:-8%;width:10px;height:16px;border-radius:2px;
+    animation:confFall linear infinite;
+  }
+  @keyframes confFall{
+    0%{transform:translateY(-10vh) rotate(0deg);opacity:0}
+    8%{opacity:1}
+    100%{transform:translateY(115vh) rotate(760deg);opacity:.9}
+  }
+  /* 패널 등장 팝 + 타이틀 반짝임 */
+  #clearOv.on .panel{animation:clearPop .5s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes clearPop{
+    0%{transform:rotate(-.6deg) scale(.6);opacity:0}
+    60%{transform:rotate(-.6deg) scale(1.06)}
+    100%{transform:rotate(-.6deg) scale(1);opacity:1}
+  }
+  #clearOv .burst-title{animation:titleShine 1.8s ease-in-out infinite}
+  @keyframes titleShine{
+    0%,100%{filter:drop-shadow(0 0 0 rgba(255,210,63,0))}
+    50%{filter:drop-shadow(0 0 16px rgba(255,210,63,.9))}
+  }
+  #clearOv .panel{position:relative;z-index:1}
+  #clearStats .stat{animation:statPop .45s backwards}
+  @keyframes statPop{from{transform:scale(.4) rotate(-8deg);opacity:0}to{transform:none;opacity:1}}
   #clearStats{
     display:flex;gap:10px;justify-content:center;margin-bottom:16px;flex-wrap:wrap;
   }
@@ -536,6 +578,9 @@
 
   <!-- 스테이지 클리어 -->
   <div class="overlay" id="clearOv">
+    <div class="sunburst"></div>
+    <div class="glowpulse"></div>
+    <div class="confetti" id="confetti"></div>
     <div class="panel">
       <div class="burst-title" style="color:var(--red)">싹 다 부쉈다!!</div>
       <div class="sub" id="clearSub">STAGE 1 클리어</div>
@@ -1381,10 +1426,15 @@ function hulkScale(){
   const giant = G.buffGiantT > 0
     ? 1 + 0.25 * clamp(G.buffGiantT / 0.35, 0, 1) * clamp(G.buffGiantIn / 0.35, 0, 1)
     : 1;
-  return (1 + Math.min(G.stage - 1, 9) * 0.11)
+  const raw = (1 + Math.min(G.stage - 1, 9) * 0.11)
     * (1 + 0.35 * G.rageRamp)
     * (1 + 0.06 * G.upgrades.size)
     * giant;
+  /* 화면이 좁거나 모바일이면 덩치 상한을 낮춰 화면을 꽉 채우지 않게 */
+  const room = clamp(viewW / 1300, 0.45, 1);
+  let cap = 3.4 * (0.55 + 0.45 * room);
+  if (document.body.classList.contains('touchmode')) cap *= 0.78;
+  return Math.min(raw, cap);
 }
 function hulkH(){ return H.baseH * hulkScale(); }
 function hulkW(){ return H.baseW * hulkScale(); }
@@ -4258,14 +4308,53 @@ const ACTIVES = [
   { key: 'spin', name: '토네이도 스핀', kb: 'T', desc: '회전하며 주변 360°\n전부 갈아버림' },
   { key: 'stomp', name: '기가 스톰프', kb: 'G', desc: '전진 발구르기 3연타\n쿵마다 충격파' },
 ];
+/* 클리어 화면 색종이 뿌리기 */
+const CONFETTI_COLS = ['#ffd23f', '#4cbb4f', '#ff4b33', '#39a9db', '#6c4fa8', '#fff8e7'];
+function spawnConfetti(count){
+  const box = document.getElementById('confetti');
+  if (!box) return;
+  box.innerHTML = '';
+  const n = reducedMotion ? 0 : count;
+  for (let i = 0; i < n; i++) {
+    const el = document.createElement('i');
+    el.style.left = (Math.random() * 100).toFixed(1) + '%';
+    el.style.background = CONFETTI_COLS[i % CONFETTI_COLS.length];
+    el.style.animationDuration = (2.2 + Math.random() * 2.4).toFixed(2) + 's';
+    el.style.animationDelay = (Math.random() * 1.6).toFixed(2) + 's';
+    el.style.width = (6 + Math.random() * 8).toFixed(0) + 'px';
+    el.style.height = (10 + Math.random() * 12).toFixed(0) + 'px';
+    el.style.opacity = 0.75 + Math.random() * 0.25;
+    box.appendChild(el);
+  }
+}
+/* 숫자가 0에서 차오르는 연출 */
+function countUp(el, target, dur, fmt){
+  if (!el) return;
+  const t0 = performance.now();
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    const v = Math.round(target * eased);
+    el.textContent = fmt ? v.toLocaleString() : String(v);
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 function showClear(){
   G.state = 'clear';
   SND.fanfare();
   BGM.duck(0.09);
+  spawnConfetti(28);
   ui.clearSub.textContent = 'STAGE ' + G.stage + (G.bossDefeated ? ' — BOSS 격파!!' : ' — ' + G.theme.name + ' 클리어');
-  ui.stDestroyed.textContent = G.stageDestroyed;
-  ui.stCombo.textContent = G.maxCombo;
-  ui.stScore.textContent = G.stageScore.toLocaleString();
+  countUp(ui.stDestroyed, G.stageDestroyed, 700);
+  countUp(ui.stCombo, G.maxCombo, 850);
+  countUp(ui.stScore, G.stageScore, 1100, true);
+  /* 스탯 카드가 하나씩 튀어나오게 */
+  const stats = document.querySelectorAll('#clearStats .stat');
+  stats.forEach((el, i) => { el.style.animationDelay = (0.12 + i * 0.12) + 's'; });
+  /* 축포 소리 */
+  setTimeout(() => SND.comboDing(18), 260);
+  setTimeout(() => SND.comboDing(26), 420);
   const nextUnlock = Object.entries(UNLOCK_STAGE).find(([, s]) => s === G.stage + 1);
   if (nextUnlock && nextUnlock[0] !== 'punch') {
     ui.unlockCard.classList.add('on');
