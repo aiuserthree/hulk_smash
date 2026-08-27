@@ -650,7 +650,7 @@
     <div id="skills">
       <div class="skill chip" id="sk-punch"><span class="key">Z</span><div class="name">주먹</div><div class="cd"></div><span class="lv"></span></div>
       <div class="skill chip locked" id="sk-slam"><span class="key">X</span><div class="name">메테오</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
-      <div class="skill chip locked" id="sk-clap"><span class="key">C</span><div class="name">합장박수</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
+      <div class="skill chip locked" id="sk-clap"><span class="key">C</span><div class="name">합장</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip locked" id="sk-dash"><span class="key">V</span><div class="name">혜성돌진</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip locked" id="sk-rage"><span class="key">R</span><div class="name">분노</div><div id="rageFill"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip locked" id="sk-thunder"><span class="key">B</span><div class="name">낙뢰</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
@@ -671,7 +671,7 @@
     <div class="tbtn" id="tJump">점프</div>
     <div class="tbtn" id="tPunch">주먹!<span class="lv"></span></div>
     <div class="tbtn tskill locked" id="tSlam">메테오<span class="tcd"></span><span class="lv"></span></div>
-    <div class="tbtn tskill locked" id="tClap">박수<span class="tcd"></span><span class="lv"></span></div>
+    <div class="tbtn tskill locked" id="tClap">합장<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill locked" id="tDash">혜성<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill locked" id="tRage">분노<span class="tcd"></span><span class="lv"></span></div>
     <div class="tbtn tskill hidden" id="tQuake">퀘이크<span class="tcd"></span><span class="lv"></span></div>
@@ -699,7 +699,7 @@
           <div class="ctrlH">스킬 <em>스테이지마다 해제</em></div>
           <div class="ctrlLine wrap">
             <span class="kb">X</span><b>메테오</b>
-            <span class="kb">C</span><b>박수</b>
+            <span class="kb">C</span><b>합장</b>
             <span class="kb">V</span><b>돌진</b>
             <span class="kb">R</span><b>분노</b>
             <span class="kb">B</span><b>낙뢰</b>
@@ -4682,7 +4682,7 @@ function setCd(name, cd, max){
 }
 
 /* ---------- 클리어 ---------- */
-const SKILL_NAMES = { slam: '메테오 슬램 (X)', clap: '합장 박수 (C)', dash: '혜성 돌진 (V)', rage: '분노 폭발 (R)', thunder: '낙뢰 폭풍 (B)' };
+const SKILL_NAMES = { slam: '메테오 슬램 (X)', clap: '합장 (C)', dash: '혜성 돌진 (V)', rage: '분노 폭발 (R)', thunder: '낙뢰 폭풍 (B)' };
 /* 보스 보상: 직접 쓰는 액티브 스킬 (중복 선택 시 레벨업) */
 const ACTIVES = [
   { key: 'quake', name: '어스퀘이크', kb: 'Q', desc: '땅을 내리찍어\n화면 전체를 분쇄' },
@@ -7186,8 +7186,9 @@ function drawHulk(){
     if (spinning) return [front ? 1.5 : -1.5, 0.05, 1]; /* 팔 벌리고 회전 */
     if (stomping) return front ? [0.5, 1.35, 1] : [-0.5, 1.3, 1]; /* 주먹 쥐고 행진 */
     if (H.roarT > 0) return front ? [1.05, 1.15, 1] : [-0.95, 0.9, 1];
-    if (H.slam === 1) return [2.65, -0.2, 1];
-    if (H.slam === 2) return [1.05, -0.1, 1];
+    /* 두 팔에 같은 값을 주면 완전히 겹쳐 팔이 하나로 보인다 → 각도를 벌린다 */
+    if (H.slam === 1) return front ? [2.78, -0.16, 1] : [2.48, -0.30, 1];   /* 도약: 두 팔을 머리 위로 */
+    if (H.slam === 2) return front ? [0.78, -0.06, 1] : [0.58, -0.20, 1];   /* 낙하: 주먹을 앞-아래로 내리꽂기 */
     if (dashing) return front ? [0.3 + Math.sin(t2) * 0.8, 1.25, 1] : [0.3 - Math.sin(t2) * 0.8, 1.25, 1];
     if (!H.onGround) {
       /* 팔도 궤적 따라 연속 변화: 뒤로 젖힘 → 정점 → 앞으로 뻗기 */
@@ -7201,52 +7202,71 @@ function drawHulk(){
     return front ? [0.3, 0.36, 1] : [-0.38, 0.32, 1];
   }
   /* 각진 주먹: 너클 4개 스캘럽 + 손가락 마디선 + 감긴 엄지 */
+  /* 각진 주먹 (레퍼런스: 헐크 핸즈) — 길쭉한 주걱이 아니라 뭉툭한 블록.
+     앞면에 너클 4개가 뚜렷하게 튀어나오고, 접힌 손가락 마디선과 감긴 엄지가 보인다.
+     로컬 좌표: +x = 팔이 뻗은 방향(주먹 앞면), y = 위아래 */
   function drawFist(x, y, canvasAng, r, front){
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(canvasAng);
-    const L = r * 2.1, Hh = r * 1.7;
-    const g = ctx.createLinearGradient(0, -Hh * 0.5, 0, Hh * 0.5);
+    const L = r * 1.68, Hh = r * 1.94;          /* 깊이 < 높이 → 두툼한 덩어리 */
+    const g = ctx.createLinearGradient(-L * 0.4, -Hh * 0.5, L * 0.5, Hh * 0.5);
     g.addColorStop(0, front ? P.base : P.mid);
-    g.addColorStop(0.6, front ? P.mid : P.dark);
+    g.addColorStop(0.58, front ? P.mid : P.dark);
     g.addColorStop(1, front ? P.dark : P.deep);
     ctx.fillStyle = g;
+    /* 실루엣: 손등 → 너클 4개 → 새끼손가락 아래 → 손목 */
+    const kTop = -Hh * 0.46, kBot = Hh * 0.50, step = (kBot - kTop) / 4;
     ctx.beginPath();
-    ctx.moveTo(-L * 0.42, -Hh * 0.38);
-    ctx.quadraticCurveTo(-L * 0.1, -Hh * 0.54, L * 0.22, -Hh * 0.48);
-    for (let i = 0; i < 4; i++) {
-      const y0 = -Hh * 0.48 + i * (Hh * 0.92 / 4);
-      const y1 = y0 + Hh * 0.92 / 4;
-      ctx.quadraticCurveTo(L * 0.56, (y0 + y1) / 2, L * 0.3, y1);
+    ctx.moveTo(-L * 0.52, -Hh * 0.30);
+    ctx.quadraticCurveTo(-L * 0.40, kTop - Hh * 0.06, -L * 0.02, kTop);   /* 손등 능선 */
+    for (let i = 0; i < 4; i++) {                                         /* 너클 */
+      const y0 = kTop + i * step, y1 = y0 + step;
+      const out = L * (0.60 - i * 0.045);                                 /* 검지가 가장 튀어나옴 */
+      ctx.quadraticCurveTo(out, (y0 + y1) / 2, L * 0.26 - i * L * 0.03, y1);
     }
-    ctx.quadraticCurveTo(-L * 0.05, Hh * 0.54, -L * 0.42, Hh * 0.4);
+    ctx.quadraticCurveTo(-L * 0.20, kBot + Hh * 0.10, -L * 0.52, Hh * 0.34);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
-    /* 손가락 마디선 */
+    /* 접힌 손가락 마디선 — 너클에서 손바닥 쪽으로 짧게 */
     ctx.save();
     ctx.strokeStyle = defLine;
-    ctx.lineWidth = outW * 0.5;
+    ctx.lineWidth = outW * 0.55;
+    ctx.lineCap = 'round';
     for (let i = 1; i < 4; i++) {
-      const yy = -Hh * 0.48 + i * (Hh * 0.92 / 4);
+      const yy = kTop + i * step;
       ctx.beginPath();
-      ctx.moveTo(L * 0.3, yy);
-      ctx.quadraticCurveTo(L * 0.04, yy * 0.85, -L * 0.16, yy * 0.8);
+      ctx.moveTo(L * 0.30 - i * L * 0.03, yy);
+      ctx.quadraticCurveTo(L * 0.02, yy * 0.9, -L * 0.26, yy * 0.78);
       ctx.stroke();
     }
+    /* 너클 능선 (주먹 앞면을 따라 도는 선) */
+    ctx.strokeStyle = 'rgba(20,28,10,.30)';
+    ctx.beginPath();
+    ctx.moveTo(L * 0.10, kTop + step * 0.15);
+    ctx.quadraticCurveTo(L * 0.30, Hh * 0.02, L * 0.06, kBot - step * 0.2);
+    ctx.stroke();
     ctx.restore();
-    /* 엄지 */
-    if (front) {
-      const tg2 = ctx.createLinearGradient(0, 0, 0, Hh * 0.55);
-      tg2.addColorStop(0, P.base);
-      tg2.addColorStop(1, P.dark);
-      ctx.fillStyle = tg2;
-      ctx.beginPath();
-      ctx.moveTo(-L * 0.18, Hh * 0.1);
-      ctx.quadraticCurveTo(L * 0.24, Hh * 0.16, L * 0.16, Hh * 0.4);
-      ctx.quadraticCurveTo(L * 0.02, Hh * 0.58, -L * 0.24, Hh * 0.44);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-    }
+    /* 손등 하이라이트 */
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = P.hi;
+    ctx.beginPath();
+    ctx.ellipse(-L * 0.12, -Hh * 0.20, L * 0.26, Hh * 0.18, -0.25, 0, 7);
+    ctx.fill();
+    ctx.restore();
+    /* 감긴 엄지 — 앞면 아래를 가로질러 덮는다 */
+    const tg2 = ctx.createLinearGradient(-L * 0.3, Hh * 0.1, L * 0.3, Hh * 0.55);
+    tg2.addColorStop(0, front ? P.base : P.mid);
+    tg2.addColorStop(1, front ? P.dark : P.deep);
+    ctx.fillStyle = tg2;
+    ctx.beginPath();
+    ctx.moveTo(-L * 0.34, Hh * 0.06);
+    ctx.quadraticCurveTo(L * 0.10, Hh * 0.02, L * 0.26, Hh * 0.22);
+    ctx.quadraticCurveTo(L * 0.34, Hh * 0.42, L * 0.06, Hh * 0.46);
+    ctx.quadraticCurveTo(-L * 0.20, Hh * 0.48, -L * 0.36, Hh * 0.34);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
     ctx.restore();
   }
   function deltoid(front, shX, shY){
@@ -7452,8 +7472,9 @@ function drawHulk(){
          손이 만나지 못한다. 준비 자세도 한쪽만 아래로 젖히면 막대기 두 개처럼 보이므로
          양팔 모두 위-바깥으로 들어올려 팔꿈치가 확실히 굽게 만든다. */
       const meet = [bodyW * 0.20, shYBase + bodyH * 0.15];      /* 가슴 앞 합장점 */
-      const fOpen = [bodyW * 0.62, shYBase - armLenU * 0.62];   /* 앞팔: 앞-위로 (얼굴을 가리지 않게 앞쪽으로) */
-      const bOpen = [-bodyW * 0.68, shYBase - armLenU * 0.45];  /* 뒷팔: 뒤-위로 젖힘 */
+      /* 활짝 벌리는 단계: 양팔을 좌우로 크게 편다 (어깨 높이 살짝 위, 팔꿈치는 굽은 채) */
+      const fOpen = [bodyW * 0.78, shYBase - bodyH * 0.10];     /* 앞팔: 앞으로 활짝 */
+      const bOpen = [-bodyW * 0.76, shYBase - bodyH * 0.09];    /* 뒷팔: 뒤로 활짝 */
       const idleF = [bodyW * 0.45, shYBase + armLenU * 1.15];
       const idleB = [-bodyW * 0.42, shYBase + armLenU * 1.15];
       if (clapPh < 0.4) {
