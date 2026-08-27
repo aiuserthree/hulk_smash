@@ -2078,16 +2078,49 @@ function hitZombies(lo, hi, dir){
     const gain = addScore(Math.round(60 * (z.scoreMul || 1)));
     bumpCombo();
     popup(z.x + rand(-16, 16), GROUND - z.h - 30, '+' + gain, 21, '#c9e6a0');
-    spawnBlood(z.x, GROUND - z.h * 0.55, d, 12);
-    addBurst(z.x, GROUND - z.h * 0.6, 28);
+    /* 처치 폭발: 거구일수록 더 크게 터진다 */
+    const big = (z.kind === 'brute');
+    const gy = GROUND - z.h * 0.55;
+    spawnBlood(z.x, gy, d, big ? 26 : 17);
+    spawnBlood(z.x, gy, -d, big ? 10 : 6);
+    addBurst(z.x, GROUND - z.h * 0.6, big ? 48 : 34);
+    addFlare(z.x, gy, big ? 130 : 84, 'rgba(200,45,35,.75)', 0.22);
+    if (big) addRays(z.x, gy, 8, 'rgba(255,120,90,.85)', 150, 0.2);
+    /* 튀는 살점 파편 */
+    const ng = Math.min(big ? 9 : 5, 340 - G.particles.length);
+    for (let gi = 0; gi < ng; gi++) G.particles.push({
+      x: z.x + rand(-10, 10), y: gy + rand(-14, 14),
+      vx: d * rand(120, 460) + rand(-80, 80), vy: -rand(120, 420),
+      size: rand(4, big ? 11 : 8), color: pick(['#8a1c22', '#a8232a', '#6e1a1e', '#7c3b30']),
+      rot: rand(0, 6.3), vr: rand(-12, 12),
+      t: 0, life: rand(0.5, 1.0), type: 'chunk',
+    });
     addSplat(z.x + d * 22);
+    if (big) addSplat(z.x - d * 26);
     if (Math.random() < 0.06) spawnDrop(z.x);
-    spawnDust(z.x, GROUND - z.h * 0.4, 2, 14);
+    spawnDust(z.x, GROUND - z.h * 0.4, big ? 5 : 2, 18);
     if (G.rageT > 0) G.rageT = Math.min(G.rageT + 0.12, 10);
   }
   if (n) {
     SND.zsplat();
-    shake(Math.min(2 + n, 6));
+    shake(Math.min(2 + n * 1.6, 14));
+    /* 한 방에 여러 마리: 연출이 점점 커진다 */
+    if (n >= 3) {
+      addRing(H.x, GROUND, 200 + n * 26, '#ff6a5a', 6);
+      addFlare(H.x, GROUND - hulkH() * 0.5, 180 + n * 22, 'rgba(255,80,60,.8)', 0.34);
+      screenTint('220,60,45', Math.min(0.2 + n * 0.05, 0.55));
+      popup(H.x, GROUND - hulkH() - 70, n + '연속 처치!!', 26 + Math.min(n * 2.4, 22), '#ff8a7a');
+      impact(0.04);
+      SND.crash();
+    }
+    if (n >= 6) {
+      addRays(H.x, GROUND - hulkH() * 0.5, 12, 'rgba(255,140,110,.9)', 320, 0.32);
+      spawnSwirl(H.x, GROUND - hulkH() * 0.45, 16, ['#c22e30', '#ff6a5a', '#ffd9d0'], 380, 60);
+      if (!reducedMotion) G.slowMo = Math.max(G.slowMo, 0.22);
+      zoomKick(0.06);
+      G.flash = Math.max(G.flash, 0.09);
+      SND.bigBoom();
+    }
     /* 좀비 흡수: 소량 회복 */
     if (H.hp < H.maxHp) {
       H.hp = Math.min(H.maxHp, H.hp + n);
@@ -3772,9 +3805,14 @@ function update(dt){
       }
       if (z.y > GROUND && z.vy > 0 && !z.bounced) {
         z.y = GROUND; z.vy *= -0.4; z.vx *= 0.7; z.bounced = true;
-        spawnDust(z.x, GROUND, 2, 12);
-        spawnBlood(z.x, 14, Math.sign(z.vx) || 1, 5);
-        if (Math.random() < 0.6) addSplat(z.x);
+        /* 바닥에 처박히는 순간: 피가 사방으로 튀고 얼룩이 번진다 */
+        spawnDust(z.x, GROUND, 4, 18);
+        spawnBlood(z.x, 14, Math.sign(z.vx) || 1, 10);
+        spawnBlood(z.x, 14, -(Math.sign(z.vx) || 1), 5);
+        addBurst(z.x, GROUND - 12, 26);
+        addSplat(z.x);
+        if (Math.random() < 0.5) addSplat(z.x + rand(-30, 30));
+        shake(2);
       }
       if (z.t - z.launchT > 1.1) z.dead = true;
     }
