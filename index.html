@@ -2306,7 +2306,7 @@ function addCrack(x, r){
 }
 function shake(amt){
   if (reducedMotion) amt *= 0.25;
-  G.shake = Math.min(G.shake + amt, 55);
+  G.shake = Math.min(G.shake + amt * 0.65, 32);   /* 흔들림 과함 → 증가폭·누적 상한 완화 */
 }
 /* 임팩트 순간 화면이 훅 당겨지는 줌 킥 */
 function zoomKick(amt){
@@ -4559,7 +4559,7 @@ function update(dt){
   const targetCam = clamp(H.x - viewW * 0.45, 0, Math.max(0, G.worldLen - viewW));
   G.camX += (targetCam - G.camX) * Math.min(1, dt * 7);
 
-  if (G.shake > 0) G.shake = Math.max(0, G.shake - dt * 55);
+  if (G.shake > 0) G.shake = Math.max(0, G.shake - dt * 70);   /* 더 빨리 잦아들게 */
   if (G.flash > 0) G.flash = Math.max(0, G.flash - dt);
 
   /* 클리어 지연 */
@@ -4839,8 +4839,8 @@ function render(){
   ctx.save();
   let shx = 0, shy = 0;
   if (G.shake > 0.5) {
-    shx = rand(-G.shake, G.shake) * viewScale * 0.5;
-    shy = rand(-G.shake, G.shake) * viewScale * 0.5;
+    shx = rand(-G.shake, G.shake) * viewScale * 0.36;
+    shy = rand(-G.shake, G.shake) * viewScale * 0.30;
   }
   ctx.translate(shx, shy);
   /* 줌 킥: 화면 중심 기준 순간 확대 */
@@ -7180,7 +7180,7 @@ function drawHulk(){
         : [lerp2(-1.05, 0.6, airK), 0.35 + airTuck * 0.45, 1];
     }
     if (landCr > 0.2) return front ? [0.7, 0.85, 1] : [-0.45, 0.5, 1];
-    if (raging && !moving) return front ? [0.8, 1.7, 1] : [-0.7, 1.6, 1];
+    if (raging && !moving) return front ? [0.55, 0.62, 1] : [-0.52, 0.58, 1]; /* 팔꿈치만 벌린 자세 — 깊게 접으면 상완+전완이 겹쳐 통짜로 두꺼워 보인다 */
     if (moving) return front ? [0.35 - swing * 0.85, 1.15, 1] : [0.35 + swing * 0.85, 1.15, 1]; /* 러닝: 굽힌 팔 펌핑 */
     return front ? [0.3, 0.36, 1] : [-0.38, 0.32, 1];
   }
@@ -7256,9 +7256,10 @@ function drawHulk(){
     /* 뒷팔은 어깨를 낮춘 만큼 짧게 — 안 그러면 주먹이 발목까지 내려온다 */
     const armK = front ? 1 : 0.82;
     const upL = armLenU * lm * armK, foL = armLenF * lm * armK;
-    const uR = bodyW * (front ? 0.174 : 0.156) * bulk;
-    const fR = bodyW * (front ? 0.188 : 0.166) * bulk;   /* 팔뚝: 0.21 → 0.188 */
-    const wR = bodyW * (front ? 0.132 : 0.118) * bulk;
+    const armK2 = raging ? 0.9 : 1;   /* 분노는 몸 전체가 +18% 커지므로 팔은 상대적으로 얇게 */
+    const uR = bodyW * (front ? 0.174 : 0.156) * bulk * armK2;
+    const fR = bodyW * (front ? 0.188 : 0.166) * bulk * armK2;   /* 팔뚝: 0.21 → 0.188 */
+    const wR = bodyW * (front ? 0.132 : 0.118) * bulk * armK2;
     const sk = front ? skinF : skinB;
     const ex = shX + Math.sin(angU) * upL, ey = shY + Math.cos(angU) * upL;
     const aF = angU + bend;
@@ -7367,9 +7368,10 @@ function drawHulk(){
   /* ---- IK 팔: 손을 목표점으로 (합장 박수·해머용) ---- */
   function armTo(front, hxT, hyT, elbowSign, palm){
     const shX = shoulderX(front), shY = shYBase;
-    const uR = bodyW * (front ? 0.174 : 0.156) * bulk;
-    const fR = bodyW * (front ? 0.188 : 0.166) * bulk;   /* 팔뚝: 0.21 → 0.188 */
-    const wR = bodyW * (front ? 0.132 : 0.118) * bulk;
+    const armK2 = raging ? 0.9 : 1;   /* 분노는 몸 전체가 +18% 커지므로 팔은 상대적으로 얇게 */
+    const uR = bodyW * (front ? 0.174 : 0.156) * bulk * armK2;
+    const fR = bodyW * (front ? 0.188 : 0.166) * bulk * armK2;   /* 팔뚝: 0.21 → 0.188 */
+    const wR = bodyW * (front ? 0.132 : 0.118) * bulk * armK2;
     let dx = hxT - shX, dy = hyT - shY;
     let dist = Math.hypot(dx, dy) || 1;
     const maxD = armLenU + armLenF - 6;
