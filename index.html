@@ -809,9 +809,12 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 const VH = 720;
 const GROUND = 580;
 let viewScale = 1, viewW = 1280;
+/* 프레임 부하 자동 감지 상태 — resize()가 참조하므로 반드시 그 위에서 선언(TDZ 방지) */
+let ecoMode = false, frameEma = 16.7, ecoHold = 0;
 
 function resize(){
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  /* 과부하(eco) 상태에선 렌더 해상도를 낮춘다 — 픽셀 수가 절반이 되어 채우기 부담이 크게 준다 */
+  const dpr = Math.min(window.devicePixelRatio || 1, ecoMode ? 1.35 : 2);
   cv.width  = Math.floor(innerWidth * dpr);
   cv.height = Math.floor(innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -824,7 +827,33 @@ resize();
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* 폰은 채우기(fill-rate) 부담이 커서 파티클·발광 이펙트 상한을 낮춘다 */
-function lowFx(){ return document.body.classList.contains('touchmode'); }
+function lowFx(){ return ecoMode || document.body.classList.contains('touchmode'); }
+/* 매 프레임 filter로 새 배열을 만들면 초당 수백 개가 쌓여 GC가 몰린다 → 제자리 압축 */
+function compact(arr, keep){
+  let w = 0;
+  for (let i = 0; i < arr.length; i++) { const v = arr[i]; if (keep(v)) arr[w++] = v; }
+  arr.length = w;
+}
+/* 전체 화면 방사형 오버레이는 매 프레임 그라디언트 픽셀을 다시 계산해 비싸다 →
+   화면 크기당 한 번만 구워서 알파만 바꿔 blit */
+const _ovTex = new Map();
+function overlayTex(key, draw){
+  /* 방사형 그라디언트는 매끄러워서 축소 저장 후 확대해도 차이가 없다.
+     512px로 구우면 굽는 비용이 20배 가까이 줄어 최초 발동 프레임이 튀지 않는다.
+     (창이 0×0인 순간에도 drawImage가 던지지 않도록 최소 1px 보장) */
+  const w0 = Math.max(1, cv.width), h0 = Math.max(1, cv.height);
+  const q = Math.min(1, 512 / Math.max(w0, h0));
+  const w = Math.max(1, Math.round(w0 * q)), h = Math.max(1, Math.round(h0 * q));
+  let o = _ovTex.get(key);
+  if (!o || o.w !== w || o.h !== h) {
+    const c2 = document.createElement('canvas');
+    c2.width = w; c2.height = h;
+    draw(c2.getContext('2d'), w, h);
+    o = { cv: c2, w, h };
+    _ovTex.set(key, o);
+  }
+  return o.cv;
+}
 function pCap(){ return lowFx() ? 230 : 340; }
 
 /* ---------- 모바일 확대(핀치·더블탭) 방지 ---------- */
@@ -920,7 +949,7 @@ function noiseBuf(dur){
   const key = Math.max(1, Math.round(dur * 100));
   let bank = _noiseCache.get(key);
   if (!bank) {
-    if (_noiseCache.size > 48) _noiseCache.clear();
+    if (_noiseCache.size > 48) _noiseCache.delete(_noiseCache.keys().next().value); /* 통째로 비우면 재생성 스파이크 */
     const n = Math.max(1, Math.floor(AC.sampleRate * (key / 100)));
     bank = [];
     for (let v = 0; v < 3; v++) {
@@ -953,9 +982,13 @@ function pNoise(o){
 }
 /* o: {when, type, f0, f1, dur, vol, dist, vib:[rate,depth]} */
 let sfxBudget = 0;          /* 프레임당 새 효과음 개수 (오디오 노드 폭주 방지) */
+let sfxWinT = -1, sfxWinN = 0;   /* 0.25초 창 누적 — 순간 폭주뿐 아니라 지속 폭주도 막는다 */
 function sfxAllow(){
-  if (sfxBudget >= 14) return false;
-  sfxBudget++;
+  if (sfxBudget >= 8) return false;
+  const t = AC ? AC.currentTime : 0;
+  if (sfxWinT < 0 || t - sfxWinT > 0.25) { sfxWinT = t; sfxWinN = 0; }
+  if (sfxWinN >= 32) return false;
+  sfxBudget++; sfxWinN++;
   return true;
 }
 function pTone(o){
@@ -1152,12 +1185,12 @@ const BGM = {
     const spb = 60 / bpm / 4; /* 16분음표 */
     /* 백그라운드 탭에서 돌아온 직후 밀린 노트 몰아치기 방지 */
     if (this.nextT < AC.currentTime - 0.1) this.nextT = AC.currentTime + 0.05;
-    while (this.nextT < AC.currentTime + 0.25) {
+    while (this.nextT < AC.currentTime + 0.40) {   /* 프레임이 밀려도 음악이 끊기지 않도록 여유 확대 */
       this.schedule(this.step, this.nextT, spb);
       this.nextT += spb;
       this.step = (this.step + 1) % 128;
     }
-    this.timer = setTimeout(() => this.tick(), 90);
+    this.timer = setTimeout(() => this.tick(), 80);
   },
   n(t, freq, dur, type, vol, lpf){
     const o = AC.createOscillator(); o.type = type;
@@ -3027,7 +3060,7 @@ function updateProjs(dt){
       hitZombies(pr.x - 110, pr.x + 110, 0);
     }
   }
-  G.projs = G.projs.filter(pr => !pr.dead);
+  compact(G.projs, pr => !pr.dead);
 }
 
 /* 낙뢰 (하늘에서 번개 내리꽂기) */
@@ -3224,7 +3257,7 @@ function updateDrops(dt){
       if (d.y >= GROUND - 16 && d.vy > 0) { d.y = GROUND - 16; d.grounded = true; }
     }
   }
-  G.drops = G.drops.filter(d => !d.dead && d.t < d.life);
+  compact(G.drops, d => !d.dead && d.t < d.life);
 }
 /* 드롭 아이콘: 글로우 배지 + 타입별 심볼 */
 const DROP_COLS = {
@@ -3881,7 +3914,7 @@ function updateHurls(dt){
       SND.bigBoom();
     }
   }
-  G.hurls = G.hurls.filter(hu => !hu.dead);
+  compact(G.hurls, hu => !hu.dead);
 }
 
 /* ---------- 업데이트 ---------- */
@@ -3983,9 +4016,9 @@ function update(dt){
   if (G.boltFlash > 0) G.boltFlash = Math.max(0, G.boltFlash - dt * 3.2);
   if (G.tintA > 0) G.tintA = Math.max(0, G.tintA - dt * 1.9);
   for (const fl of G.flares) fl.t += dt;
-  G.flares = G.flares.filter(fl => fl.t < fl.life);
+  compact(G.flares, fl => fl.t < fl.life);
   for (const ry of G.rays) ry.t += dt;
-  G.rays = G.rays.filter(ry => ry.t < ry.life);
+  compact(G.rays, ry => ry.t < ry.life);
   updateDrops(dt);
 
   /* 이동 */
@@ -4191,7 +4224,7 @@ function update(dt){
       if (z.t - z.launchT > 1.1) z.dead = true;
     }
   }
-  G.zombies = G.zombies.filter(z => !z.dead);
+  compact(G.zombies, z => !z.dead);
 
   /* 토네이도 스핀 */
   if (H.spinT > 0) {
@@ -4296,9 +4329,9 @@ function update(dt){
     pb.delay -= dt;
     if (pb.delay <= 0) spawnBolt(pb.x, pb.mult);
   }
-  G.pendingBolts = G.pendingBolts.filter(pb => pb.delay > 0);
+  compact(G.pendingBolts, pb => pb.delay > 0);
   for (const bo of G.bolts) bo.t += dt;
-  G.bolts = G.bolts.filter(bo => bo.t < bo.life);
+  compact(G.bolts, bo => bo.t < bo.life);
 
   /* 걷기 애니메이션 + 발걸음 먼지·쿵 소리 */
   if (Math.abs(H.vx) > 10 && H.onGround) {
@@ -4352,7 +4385,7 @@ function update(dt){
     if (!w.fromBoss) hitBoss(lo, hi, w.dmg, w.id, 'lastWave');
     if (!reducedMotion) spawnDust(front, GROUND, 1, 12);
   }
-  G.waves = G.waves.filter(w => w.traveled < w.range);
+  compact(G.waves, w => w.traveled < w.range);
 
   /* 파티클 */
   for (const p of G.particles) {
@@ -4427,21 +4460,21 @@ function update(dt){
       }
     }
   }
-  G.emitters = G.emitters.filter(em => em.t < em.life);
+  compact(G.emitters, em => em.t < em.life);
 
   /* 팝업 */
   for (const p of G.popups) { p.t += dt; p.y += p.vy * dt; p.vy *= 0.92; }
-  G.popups = G.popups.filter(p => p.t < 1.0);
+  compact(G.popups, p => p.t < 1.0);
 
   /* 링 / 균열 */
   for (const r of G.rings) { r.t += dt; r.r += (r.maxR - r.r) * 10 * dt; }
-  G.rings = G.rings.filter(r => r.t < 0.5);
+  compact(G.rings, r => r.t < 0.5);
   for (const c of G.cracks) c.t += dt;
-  G.cracks = G.cracks.filter(c => c.t < 6);
+  compact(G.cracks, c => c.t < 6);
 
   /* 임팩트 버스트 / 카메라 킥 감쇠 */
   for (const b of G.bursts) b.t += dt;
-  G.bursts = G.bursts.filter(b => b.t < b.life);
+  compact(G.bursts, b => b.t < b.life);
   G.camKick *= Math.exp(-9 * dt);
   G.zoomKick *= Math.exp(-7 * dt);
 
@@ -4473,7 +4506,7 @@ function update(dt){
       });
     }
   }
-  G.wrecks = G.wrecks.filter(wk => wk.t < wk.life);
+  compact(G.wrecks, wk => wk.t < wk.life);
 
   /* 사물 애니메이션 */
   for (const o of G.objects) {
@@ -4488,7 +4521,7 @@ function update(dt){
       }
     }
   }
-  G.objects = G.objects.filter(o => o.hp > 0 || o.dying < 0.45);
+  compact(G.objects, o => o.hp > 0 || o.dying < 0.45);
 
   /* 구름 */
   for (const c of G.clouds) { c.x += c.v * dt; if (c.x > G.worldLen + 300) c.x = -300; }
@@ -5478,11 +5511,12 @@ function render(){
     ctx.fillRect(0, 0, W, Hpx);
   }
   /* 비네트 */
-  const vg = ctx.createRadialGradient(W / 2, Hpx * 0.45, Hpx * 0.5, W / 2, Hpx * 0.55, Hpx * 0.95);
-  vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(8,10,18,.24)');
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, W, Hpx);
+  ctx.drawImage(overlayTex('vig', (c2, w, h) => {
+    const g = c2.createRadialGradient(w / 2, h * 0.45, h * 0.5, w / 2, h * 0.55, h * 0.95);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(8,10,18,.24)');
+    c2.fillStyle = g; c2.fillRect(0, 0, w, h);
+  }), 0, 0, W, Hpx);
 
   /* 쓰러짐: 화면이 점점 어두워지며 붉은 조리개 */
   if (G.state === 'defeat') {
@@ -5499,28 +5533,40 @@ function render(){
   /* 피격 붉은 테두리 */
   if (G.hurtT > 0) {
     const ha = (G.hurtT / 0.4) * 0.4;
-    const hg2 = ctx.createRadialGradient(W / 2, Hpx / 2, Hpx * 0.32, W / 2, Hpx / 2, Hpx * 0.72);
-    hg2.addColorStop(0, 'rgba(200,30,20,0)');
-    hg2.addColorStop(1, 'rgba(200,30,20,' + ha + ')');
-    ctx.fillStyle = hg2;
-    ctx.fillRect(0, 0, W, Hpx);
+    ctx.save();
+    ctx.globalAlpha = ha;
+    ctx.drawImage(overlayTex('hurt', (c2, w, h) => {
+      const g = c2.createRadialGradient(w / 2, h / 2, h * 0.32, w / 2, h / 2, h * 0.72);
+      g.addColorStop(0, 'rgba(200,30,20,0)');
+      g.addColorStop(1, 'rgba(200,30,20,1)');
+      c2.fillStyle = g; c2.fillRect(0, 0, w, h);
+    }), 0, 0, W, Hpx);
+    ctx.restore();
   }
 
   /* 분노 화면 효과 (감마 그린) */
   if (G.rageT > 0) {
-    const rg = ctx.createRadialGradient(W / 2, Hpx / 2, Hpx * 0.35, W / 2, Hpx / 2, Hpx * 0.75);
-    rg.addColorStop(0, 'rgba(230,60,35,0)');
-    rg.addColorStop(1, 'rgba(230,60,35,' + (0.28 + Math.sin(G.time * 10) * 0.07) + ')');
-    ctx.fillStyle = rg;
-    ctx.fillRect(0, 0, W, Hpx);
+    ctx.save();
+    ctx.globalAlpha = 0.28 + Math.sin(G.time * 10) * 0.07;
+    ctx.drawImage(overlayTex('rage', (c2, w, h) => {
+      const g = c2.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, h * 0.75);
+      g.addColorStop(0, 'rgba(230,60,35,0)');
+      g.addColorStop(1, 'rgba(230,60,35,1)');
+      c2.fillStyle = g; c2.fillRect(0, 0, w, h);
+    }), 0, 0, W, Hpx);
+    ctx.restore();
   }
   /* 피버: 금빛 화면 효과 */
   if (G.feverT > 0) {
-    const fg = ctx.createRadialGradient(W / 2, Hpx / 2, Hpx * 0.36, W / 2, Hpx / 2, Hpx * 0.75);
-    fg.addColorStop(0, 'rgba(255,205,60,0)');
-    fg.addColorStop(1, 'rgba(255,180,40,' + (0.24 + Math.sin(G.time * 12) * 0.1) + ')');
-    ctx.fillStyle = fg;
-    ctx.fillRect(0, 0, W, Hpx);
+    ctx.save();
+    ctx.globalAlpha = 0.24 + Math.sin(G.time * 12) * 0.1;
+    ctx.drawImage(overlayTex('fever', (c2, w, h) => {
+      const g = c2.createRadialGradient(w / 2, h / 2, h * 0.36, w / 2, h / 2, h * 0.75);
+      g.addColorStop(0, 'rgba(255,205,60,0)');
+      g.addColorStop(1, 'rgba(255,180,40,1)');
+      c2.fillStyle = g; c2.fillRect(0, 0, w, h);
+    }), 0, 0, W, Hpx);
+    ctx.restore();
   }
 
   /* 콤보 HUD (상단 중앙) */
@@ -6933,9 +6979,21 @@ function drawHulk(){
   if (H.invulnT > 0 && G.state === 'play' && Math.floor(H.invulnT * 14) % 2 === 0) {
     ctx.globalAlpha = 0.55;
   }
-  if (raging && !lowFx()) {
-    ctx.shadowColor = 'rgba(255,90,45,.85)'; /* 레드 헐크 열기 오라 (블러는 폰에서 비싸 생략) */
-    ctx.shadowBlur = 22 + Math.sin(G.time * 9) * 8;
+  if (raging) {
+    /* 레드 헐크 열기 오라 — shadowBlur를 켜면 헐크의 드로우콜(60여 개)이 전부
+       블러 래스터라이즈되어 프레임이 통째로 끊긴다. 뒤에 한 번만 그리는 가산 글로우로 대체 */
+    const gr = 1 + Math.sin(G.time * 9) * 0.06;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const ag = ctx.createRadialGradient(0, -bodyH * 0.46, bodyH * 0.08, 0, -bodyH * 0.46, bodyH * 0.80 * gr);
+    ag.addColorStop(0, 'rgba(255,125,60,.30)');
+    ag.addColorStop(0.55, 'rgba(255,70,30,.15)');
+    ag.addColorStop(1, 'rgba(255,50,20,0)');
+    ctx.fillStyle = ag;
+    ctx.beginPath();
+    ctx.ellipse(0, -bodyH * 0.46, bodyW * 1.3 * gr, bodyH * 0.82 * gr, 0, 0, 7);
+    ctx.fill();
+    ctx.restore();
   }
 
   /* 바닥 그림자 */
@@ -8131,7 +8189,19 @@ function drawHulk(){
 let lastT = performance.now();
 function loop(now){
   const rawDt = Math.min((now - lastT) / 1000, 0.033);
+  const frameMs = now - lastT;
   lastT = now;
+  /* 실제 프레임 간격을 지수이동평균으로 보고 저사양·과부하 상황을 감지 */
+  if (frameMs > 0 && frameMs < 120 && document.visibilityState === 'visible') {
+    frameEma += (frameMs - frameEma) * 0.05;
+    if (!ecoMode) {
+      ecoHold = frameEma > 21 ? ecoHold + 1 : Math.max(0, ecoHold - 2);
+      if (ecoHold > 40) { ecoMode = true; ecoHold = 0; resize(); }
+    } else {
+      ecoHold = frameEma < 17 ? ecoHold + 1 : Math.max(0, ecoHold - 2);
+      if (ecoHold > 240) { ecoMode = false; ecoHold = 0; resize(); }
+    }
+  }
   /* 히트스톱(타격 순간 정지) → 슬로모션 → 정상 속도 */
   let dt = rawDt;
   if (G.hitStop > 0) { G.hitStop -= rawDt; dt = 0; }
