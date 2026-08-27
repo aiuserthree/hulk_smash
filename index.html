@@ -211,7 +211,24 @@
   }
   .ctrl-grid .locked-row{opacity:.45}
 
-  #ctrlNote{display:none;font-size:10.5px;font-weight:900;color:#8a8270;margin-bottom:8px;line-height:1.3}
+  /* ---------- 조작법 (그룹형) ---------- */
+  .ctrlBox{
+    text-align:left;margin:0 auto 16px;max-width:430px;
+    display:flex;flex-direction:column;gap:9px;
+  }
+  .ctrlSec{
+    border:2.5px solid var(--ink);border-radius:11px;background:#fffdf4;
+    padding:7px 11px 8px;box-shadow:3px 3px 0 rgba(22,22,31,.22);
+  }
+  .ctrlH{
+    font-family:"Black Han Sans";font-size:12px;color:var(--green-dk);
+    letter-spacing:.5px;margin-bottom:5px;
+  }
+  .ctrlH em{font-style:normal;font-family:"Noto Sans KR";font-size:10px;font-weight:900;color:#9a9484;margin-left:5px}
+  .ctrlLine{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:900;color:#4c4636;margin-top:3px}
+  .ctrlLine.wrap{flex-wrap:wrap;gap:5px 7px}
+  .ctrlLine b{font-weight:900}
+  .ctrlLine em{font-style:normal;font-size:10.5px;font-weight:900;color:#9a9484;margin-left:4px}
 
   #pauseSkinWrap{margin:10px 0 14px}
   #skinTitle2{font-size:12px;font-weight:900;color:#6a6350;margin-bottom:7px}
@@ -245,8 +262,10 @@
     #startOv .panel{padding:16px 26px}
     #startOv .burst-title{font-size:clamp(34px,6.6vh,54px);margin-bottom:2px}
     #startOv .sub{font-size:13px;margin-bottom:10px}
-    #startOv .ctrl-grid .locked-row, #startOv .ctrl-grid .kb.locked{display:none}
-    #startOv #ctrlNote{display:block}
+    .ctrlSec{padding:5px 9px 6px}
+    .ctrlH{font-size:11px;margin-bottom:3px}
+    .ctrlLine{font-size:11px;margin-top:2px}
+    .ctrlBox{gap:6px;margin-bottom:10px}
   }
 
   /* 중간 높이(560~640px) 화면: 클리어 패널이 넘치지 않게 한 단계 압축 */
@@ -298,8 +317,11 @@
   #recLine b{color:var(--green-dk)}
   @media (max-height: 500px){
     /* 가로: 잠긴 스킬 설명을 한 줄 요약으로 접어 시작 화면 높이 확보 */
-    #startOv .ctrl-grid .locked-row, #startOv .ctrl-grid .kb.locked{display:none}
-    #ctrlNote{display:block}
+    .ctrlBox{gap:4px;margin-bottom:7px;max-width:400px}
+    .ctrlSec{padding:4px 8px 5px}
+    .ctrlH{font-size:10px;margin-bottom:2px}
+    .ctrlLine{font-size:10px;margin-top:1px;gap:5px}
+    .ctrlLine em, .ctrlH em{font-size:9px}
     #startOv .panel{padding:8px 18px}
     #startOv .sub{margin-bottom:6px}
     #skinWrap{margin-top:8px}
@@ -580,7 +602,6 @@
     .burst-title{font-size:24px;text-shadow:3px 3px 0 var(--ink);-webkit-text-stroke:1.5px var(--ink);margin-bottom:2px}
     .sub{font-size:11px;margin-bottom:8px}
     .bigbtn{font-size:16px;padding:7px 20px;border-width:3px}
-    .ctrl-grid{gap:3px 10px;font-size:11px;margin-bottom:10px}
     .kb{font-size:10px;padding:1px 5px}
     #clearStats{gap:6px;margin-bottom:8px}
     .stat{padding:4px 8px;min-width:68px}
@@ -663,18 +684,33 @@
     <div class="panel">
       <div class="burst-title">헐크 스매쉬!!</div>
       <div class="sub">눈에 보이는 건 전부 부숴라. 다 부수면 다음 스테이지!<br>스테이지가 오를수록 헐크는 더 커지고, 더 강해진다.</div>
-      <div class="ctrl-grid">
-        <span class="kb">← →</span><span>이동</span>
-        <span class="kb">↑</span><span>점프 — 착지 시 미니 슬램 충격파</span>
-        <span class="kb">Z / SPACE</span><span>주먹 연타 — 꾹 누르면 잽·훅·해머 콤보</span>
-        <span class="kb locked">X</span><span class="locked-row">메테오 슬램 — STAGE 2 해제</span>
-        <span class="kb locked">C</span><span class="locked-row">합장 박수 — STAGE 3 해제</span>
-        <span class="kb locked">V</span><span class="locked-row">혜성 돌진 — STAGE 4 해제</span>
-        <span class="kb locked">R</span><span class="locked-row">분노 폭발 — STAGE 5 해제</span>
-        <span class="kb locked">B</span><span class="locked-row">낙뢰 폭풍 — STAGE 6 해제</span>
-        <span class="kb locked">Q·E·F·T·G</span><span class="locked-row">보스 격파 보상 스킬 (계속 누적!)</span>
+      <div class="ctrlBox">
+        <div class="ctrlSec">
+          <div class="ctrlH">기본 조작</div>
+          <div class="ctrlLine"><span class="kb">← →</span><span>이동</span></div>
+          <div class="ctrlLine"><span class="kb">↑</span><span>점프 <em>착지하면 충격파</em></span></div>
+          <div class="ctrlLine"><span class="kb">Z / SPACE</span><span>주먹 <em>꾹 누르면 3연타 콤보</em></span></div>
+        </div>
+        <div class="ctrlSec">
+          <div class="ctrlH">스킬 <em>스테이지마다 해제</em></div>
+          <div class="ctrlLine wrap">
+            <span class="kb">X</span><b>메테오</b>
+            <span class="kb">C</span><b>박수</b>
+            <span class="kb">V</span><b>돌진</b>
+            <span class="kb">R</span><b>분노</b>
+            <span class="kb">B</span><b>낙뢰</b>
+          </div>
+        </div>
+        <div class="ctrlSec">
+          <div class="ctrlH">보상 · 편의</div>
+          <div class="ctrlLine wrap">
+            <span class="kb">Q E F T G</span><b>보스 보상 스킬 (누적)</b>
+            <span class="kb">O</span><b>자동 사용</b>
+            <span class="kb">P</span><b>일시정지</b>
+            <span class="kb">M</span><b>음소거</b>
+          </div>
+        </div>
       </div>
-      <div id="ctrlNote">X·C·V·R·B 스킬은 STAGE 2~6에서 차례로 해제 · Q·E·F·T·G는 보스 격파 보상</div>
       <div id="startBtns" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
         <button class="bigbtn" id="continueBtn" style="display:none">이어하기</button>
         <button class="bigbtn" id="startBtn">부수러 가기!</button>
@@ -685,7 +721,7 @@
         <div id="skinRow"></div>
         <div id="recLine"></div>
       </div>
-      <div style="margin-top:14px;font-size:12px;font-weight:700;color:#8a8270">P 일시정지 · M 음소거</div>
+
     </div>
   </div>
 
@@ -6906,12 +6942,12 @@ function drawHulk(){
   const airTuck = !H.onGround ? 1 - Math.min(1, Math.abs(H.vy) / 700) : 0;
 
   /* 초근육질 체형: 넓은 어깨, 굵은 전완, 짧고 굵은 다리 */
-  const legH = bodyH * 0.42;
-  const torsoH = bodyH * 0.48;
-  const headR = bodyH * 0.092;
+  const legH = bodyH * 0.455;
+  const torsoH = bodyH * 0.445;
+  const headR = bodyH * 0.113;
   const hipY = -legH - bob * 0.4 + landCr * 15 * s;
   const thighL = legH * 0.52, shinL = legH * 0.52;
-  const armLenU = bodyH * 0.30, armLenF = bodyH * 0.31; /* 긴 팔 (너클워커 체형) */
+  const armLenU = bodyH * 0.255, armLenF = bodyH * 0.245; /* 상완≈전완, 손이 허벅지 중간에 오는 길이 */
 
   let lean = 0;
   if (dashing) lean = 0.3;
@@ -6934,7 +6970,7 @@ function drawHulk(){
   }
 
   const shYBase = hipY - torsoH * 0.76;
-  function shoulderX(front){ return front ? bodyW * 0.40 : -bodyW * 0.38; }
+  function shoulderX(front){ return front ? bodyW * 0.44 : -bodyW * 0.47; }
 
   /* ---- 다리 ---- */
   function leg(px, phase, front){
@@ -6967,7 +7003,7 @@ function drawHulk(){
     const kx = hx + Math.sin(thA) * thighL, ky = hy + Math.cos(thA) * thighL;
     const sA = thA - knee;
     const ax = kx + Math.sin(sA) * shinL, ay = ky + Math.cos(sA) * shinL;
-    const thR = bodyW * 0.24, knR = bodyW * 0.145, caR = bodyW * 0.19, anR = bodyW * 0.1;
+    const thR = bodyW * 0.255, knR = bodyW * 0.15, caR = bodyW * 0.195, anR = bodyW * 0.118;
     /* 종아리 */
     limbG(kx, ky, ax, ay, caR, anR, front ? skinF : skinB);
     /* 발 */
@@ -6995,12 +7031,13 @@ function drawHulk(){
       }
       ctx.restore();
     }
-    /* 허벅지 청바지 */
-    limbG(hx, hy, kx, ky, thR, knR * 1.25, front ? jeanF : jeanB);
+    /* 허벅지 청바지 — 허벅지 중간에서 찢겨 근육이 드러남 */
+    const mtx = lerp2(hx, kx, 0.6), mty = lerp2(hy, ky, 0.6);
+    limbG(hx, hy, mtx, mty, thR, knR * 1.5, front ? jeanF : jeanB);
     /* 찢어진 밑단 */
     ctx.fillStyle = front ? '#2c3456' : '#232a48';
-    const fx = (r, d) => kx + Math.sin(sA) * d + Math.cos(sA) * r;
-    const fy = (r, d) => ky + Math.cos(sA) * d - Math.sin(sA) * r;
+    const fx = (r, d) => mtx + Math.sin(sA) * d + Math.cos(sA) * r;
+    const fy = (r, d) => mty + Math.cos(sA) * d - Math.sin(sA) * r;
     ctx.beginPath();
     ctx.moveTo(fx(-knR * 1.2, 0), fy(-knR * 1.2, 0));
     ctx.lineTo(fx(-knR * 0.55, knR * 1.35), fy(-knR * 0.55, knR * 1.35));
@@ -7058,7 +7095,7 @@ function drawHulk(){
     if (landCr > 0.2) return front ? [0.7, 0.85, 1] : [-0.45, 0.5, 1];
     if (raging && !moving) return front ? [0.8, 1.7, 1] : [-0.7, 1.6, 1];
     if (moving) return front ? [0.35 - swing * 0.85, 1.15, 1] : [0.35 + swing * 0.85, 1.15, 1]; /* 러닝: 굽힌 팔 펌핑 */
-    return front ? [0.3, 0.36, 1] : [-0.38, 0.32, 1];
+    return front ? [0.20, 0.60, 1] : [-0.40, 0.50, 1];
   }
   /* 각진 주먹: 너클 4개 스캘럽 + 손가락 마디선 + 감긴 엄지 */
   function drawFist(x, y, canvasAng, r, front){
@@ -7129,8 +7166,8 @@ function drawHulk(){
     const shX = shoulderX(front);
     const shY = shYBase;
     const upL = armLenU * lm, foL = armLenF * lm;
-    const uR = bodyW * (front ? 0.185 : 0.165);
-    const fR = bodyW * (front ? 0.21 : 0.185);
+    const uR = bodyW * (front ? 0.184 : 0.170);
+    const fR = bodyW * (front ? 0.186 : 0.172);
     const wR = bodyW * (front ? 0.14 : 0.125);
     const sk = front ? skinF : skinB;
     const ex = shX + Math.sin(angU) * upL, ey = shY + Math.cos(angU) * upL;
@@ -7178,7 +7215,7 @@ function drawHulk(){
       ctx.restore();
     }
     /* 각진 주먹 */
-    const fiR = bodyW * (front ? 0.2 : 0.18);
+    const fiR = bodyW * (front ? 0.168 : 0.152);
     const fcx = wx + Math.sin(aF) * fiR * 0.55, fcy = wy + Math.cos(aF) * fiR * 0.55;
     drawFist(fcx, fcy, Math.atan2(Math.cos(aF), Math.sin(aF)), fiR, front);
     /* 휘두르는 팔 잔상 */
@@ -7212,8 +7249,8 @@ function drawHulk(){
   /* ---- IK 팔: 손을 목표점으로 (합장 박수·해머용) ---- */
   function armTo(front, hxT, hyT, elbowSign, palm){
     const shX = shoulderX(front), shY = shYBase;
-    const uR = bodyW * (front ? 0.185 : 0.165);
-    const fR = bodyW * (front ? 0.21 : 0.185);
+    const uR = bodyW * (front ? 0.184 : 0.170);
+    const fR = bodyW * (front ? 0.186 : 0.172);
     const wR = bodyW * (front ? 0.14 : 0.125);
     let dx = hxT - shX, dy = hyT - shY;
     let dist = Math.hypot(dx, dy) || 1;
@@ -7233,7 +7270,7 @@ function drawHulk(){
     limbG(ex, ey, hx3, hy3, fR, wR, sk);
     deltoid(front, shX, shY);
     /* 손: 합장은 손바닥(손가락 골), 해머는 각진 주먹 */
-    const fiR = bodyW * (front ? 0.2 : 0.18);
+    const fiR = bodyW * (front ? 0.168 : 0.152);
     const ha = Math.atan2(hy3 - ey, hx3 - ex);
     if (palm) {
       ctx.save();
@@ -7341,7 +7378,7 @@ function drawHulk(){
     const lw = bodyW * 0.66, sw = bodyW * 0.6;
     const yHip = hipY, yWaist = hipY - torsoH * 0.24;
     const yLat = hipY - torsoH * 0.6, ySh = hipY - torsoH * 0.92;
-    const yTrap = ySh - torsoH * 0.28;
+    const yTrap = ySh - torsoH * 0.19;
     const tg = ctx.createLinearGradient(-lw, 0, lw * 0.9, 0);
     tg.addColorStop(0, P.deep);
     tg.addColorStop(0.3, P.mid);
@@ -7502,7 +7539,7 @@ function drawHulk(){
   /* ---- 머리 ---- */
   function head(){
     const attacking = punchPh > 0 || H.slam || dashing || clapping || raging || H.roarT > 0;
-    const hx = bodyW * 0.19, hy = hipY - torsoH * 1.08 - headR * 0.7;
+    const hx = bodyW * 0.19, hy = hipY - torsoH * 1.10 - headR * 1.02;
     /* 굵은 목 */
     limbG(hx - headR * 0.05, hy + headR * 0.55, hx - headR * 0.15, hy + headR * 1.6,
           headR * 0.72, headR * 0.9, skinB);
@@ -7685,9 +7722,9 @@ function drawHulk(){
 
   /* ---- 순서: 뒤팔 → 뒷다리 → 몸통·머리 → 앞다리 → 앞팔 ---- */
   rotated(() => { if (!useHands) arm(false); });
-  leg(-bodyW * 0.17, Math.PI, false);
+  leg(-bodyW * 0.215, Math.PI, false);
   rotated(() => { torso(); head(); });
-  leg(bodyW * 0.17, 0, true);
+  leg(bodyW * 0.215, 0, true);
   rotated(() => {
     if (useHands) drawBothHands();
     else arm(true);
