@@ -857,7 +857,10 @@ function overlayTex(key, draw){
   }
   return o.cv;
 }
-function pCap(){ return lowFx() ? 230 : 340; }
+function pCap(){ return ecoMode ? 170 : (lowFx() ? 220 : 280); }
+/* 광역 사거리 상한 — 헐크가 화면 중앙이므로 화면 반폭 안쪽으로 자른다.
+   이게 없으면 고스테이지에서 화면에 보이지도 않는 건물이 부서진다. */
+function aoeCap(v){ return Math.min(v, viewW * 0.46); }
 
 /* ---------- 모바일 확대(핀치·더블탭) 방지 ---------- */
 (function(){
@@ -1927,7 +1930,8 @@ function weightedPick(pool){
 function genStage(n){
   const t = THEMES[(n - 1) % THEMES.length];
   G.theme = t;
-  G.worldLen = Math.min(2800 + n * 650, 9500);
+  /* 10스테이지 이후로도 계속 길어진다 (예전엔 9500에서 멈춰 사물 수가 고정됐다) */
+  G.worldLen = Math.min(2800 + n * 650, 9500) + Math.max(0, n - 10) * 170;
   G.objects = [];
   G.particles = []; G.popups = []; G.waves = []; G.rings = [];
   G.emitters = []; G.cracks = [];
@@ -1945,7 +1949,7 @@ function genStage(n){
 
   const pool = stageTypePool(n);
   let x = 420;
-  const hpBonus = Math.floor((n - 1) * 1.5);
+  const hpBonus = Math.floor((n - 1) * 1.9);   /* 공격력(+1.2/스테이지)보다 빠르게 올려 난이도 상승 */
   while (x < G.worldLen - 320) {
     const type = weightedPick(pool);
     const T = OBJ_TYPES[type];
@@ -1965,7 +1969,8 @@ function genStage(n){
       lastWave: -1, lastDash: -1, lastRage: -1,
       dying: 0,
     });
-    x += w + rand(50, 170);
+    /* 스테이지가 오를수록 간격이 좁아져 더 빽빽하게 들어찬다 */
+    x += w + rand(50, 170) * Math.max(0.5, 1 - n * 0.014);
   }
   G.total = G.objects.length;
 
@@ -2338,13 +2343,16 @@ function impact(sec){
 /* ---------- 공용 연출 헬퍼 (스킬 이펙트 강화용) ---------- */
 /* 색이 있는 발광 블룸 */
 function addFlare(x, y, r, col, life){
-  G.flares.push({ x, y, r, col, t: 0, life: life || 0.32 });
-  if (G.flares.length > (lowFx() ? 7 : 16)) G.flares.shift();
+  /* 블룸은 가산 블렌딩 원 채우기라 비용이 반경의 제곱으로 는다.
+     스킬 반경에 그대로 비례시키면 고스테이지에서 화면을 열몇 번 덧칠해 프레임이 통째로 멈춘다. */
+  G.flares.push({ x, y, r: Math.min(r, viewW * 0.26), col, t: 0, life: life || 0.32 });
+  if (G.flares.length > (ecoMode ? 3 : lowFx() ? 5 : 8)) G.flares.shift();
 }
 /* 방사형 속도선 (임팩트 순간 뻗어나가는 빛줄기) */
 function addRays(x, y, n, col, len, life){
-  G.rays.push({ x, y, n, col, len, rot: rand(0, 6.3), t: 0, life: life || 0.26 });
-  if (G.rays.length > (lowFx() ? 4 : 8)) G.rays.shift();
+  G.rays.push({ x, y, n: Math.min(n, 10), col, len: Math.min(len, viewW * 0.3),
+                rot: rand(0, 6.3), t: 0, life: life || 0.26 });
+  if (G.rays.length > (ecoMode ? 2 : lowFx() ? 4 : 6)) G.rays.shift();
 }
 /* 화면 전체 색 틴트 (스킬마다 고유 색으로 번쩍) */
 function screenTint(col, amt){
@@ -3140,8 +3148,8 @@ function spawnBolt(x, mult){
 /* 파괴 흔적 */
 function trimRemains(){
   /* 얼룩(splat)은 자체 상한이 있으므로 그을음·잔해만 오래된 것부터 정리 */
-  if (G.remains.length <= 70) return;
-  for (let i = 0; i < G.remains.length && G.remains.length > 70; i++) {
+  if (G.remains.length <= 44) return;
+  for (let i = 0; i < G.remains.length && G.remains.length > 44; i++) {
     if (G.remains[i].kind !== 'splat') { G.remains.splice(i, 1); i--; }
   }
 }
@@ -3534,7 +3542,7 @@ function doSlam(){
   popup(H.x, GROUND - hulkH() - 40, 'METEOR SLAM!!', 30, '#ffd23f');
 }
 function slamImpact(){
-  const r = (280 + G.stage * 18) * (G.rageT > 0 ? 1.3 : 1) * (1 + 0.25 * G.upgrades.slam);
+  const r = aoeCap((280 + G.stage * 18) * (G.rageT > 0 ? 1.3 : 1) * (1 + 0.25 * G.upgrades.slam));
   const dmg = power() * 3 * (G.rageT > 0 ? 2 : 1);
   for (const o of objectsInRange(H.x - r, H.x + r)) damageObj(o, dmg, o.x + o.w / 2, true);
   hitZombies(H.x - r, H.x + r, 0);
@@ -3574,7 +3582,7 @@ function slamImpact(){
   /* 양방향 여진 지진파 (강화) */
   for (const d of [1, -1]) G.waves.push({
     x: H.x, dir: d, traveled: r * 0.3,
-    range: r + 280 + G.stage * 14, speed: 800,
+    range: aoeCap(r + 280 + G.stage * 14), speed: 800,
     id: Math.random(), dmg: Math.max(1, Math.ceil(power() * 1.2)), gold: true,
   });
   /* 주변 사물 전체 진동 */
@@ -3600,7 +3608,7 @@ function clapImpact(){
   G.waves.push({
     x: H.x + dir * hulkW() * 0.6,
     dir, traveled: 0,
-    range: 620 + G.stage * 40,
+    range: aoeCap(620 + G.stage * 40),
     speed: 1500,
     id: Math.random(),
     dmg: Math.max(2, Math.ceil(power() * 2.2)) * (G.rageT > 0 ? 2 : 1),
@@ -3700,7 +3708,7 @@ function doQuake(){
     G.boss.stateT = Math.max(G.boss.stateT, 1.0);
   }
   for (const d of [1, -1]) G.waves.push({
-    x: H.x, dir: d, traveled: 30, range: viewW, speed: 1000,
+    x: H.x, dir: d, traveled: 30, range: aoeCap(viewW), speed: 1000,
     id: Math.random(), dmg: 1, gold: true,
   });
   addCrack(H.x, 260);
@@ -3825,7 +3833,7 @@ function doRoar(){
   const lv = G.actives.roar;
   H.roarCd = 10 * Math.pow(0.85, lv - 1);
   H.roarT = 0.5;
-  const range = 520 + lv * 60;
+  const range = aoeCap(520 + lv * 60);
   const dmg = Math.max(1, Math.round(power() * 2 * (1 + 0.4 * (lv - 1)) * (G.rageT > 0 ? 2 : 1)));
   const lo = H.face > 0 ? H.x : H.x - range;
   const hi = H.face > 0 ? H.x + range : H.x;
@@ -5227,6 +5235,7 @@ function render(){
     const p = fl.t / fl.life;
     const a = (1 - p) * (1 - p);
     const r = fl.r * (0.5 + p * 0.9);
+    if (fl.x + r < G.camX || fl.x - r > G.camX + viewW) continue;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = a * 0.9;
@@ -5241,6 +5250,7 @@ function render(){
   for (const ry of G.rays) {
     const p = ry.t / ry.life;
     const a = 1 - p;
+    if (ry.x + ry.len < G.camX || ry.x - ry.len > G.camX + viewW) continue;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = a * 0.75;
@@ -8093,7 +8103,7 @@ function loop(now){
   if (frameMs > 0 && frameMs < 120 && document.visibilityState === 'visible') {
     frameEma += (frameMs - frameEma) * 0.05;
     if (!ecoMode) {
-      ecoHold = frameEma > 21 ? ecoHold + 1 : Math.max(0, ecoHold - 2);
+      ecoHold = frameEma > 19.5 ? ecoHold + 1 : Math.max(0, ecoHold - 2);
       if (ecoHold > 40) { ecoMode = true; ecoHold = 0; resize(); }
     } else {
       ecoHold = frameEma < 17 ? ecoHold + 1 : Math.max(0, ecoHold - 2);
