@@ -7402,8 +7402,11 @@ function drawHulk(){
   }
 
   /* ---- IK 팔: 손을 목표점으로 (합장 박수·해머용) ---- */
-  function armTo(front, hxT, hyT, elbowSign, palm){
-    const shX = shoulderX(front), shY = shYBase;
+  function armTo(front, hxT, hyT, elbowSign, palm, shXOv){
+    /* shXOv: 합장처럼 어깨가 앞으로 말리는 동작에서 어깨 x를 옮긴다.
+       옆모습에서는 두 어깨 간격(0.53*bodyH)이 팔 길이(0.485*bodyH)보다 넓어서,
+       어깨를 그대로 두면 뒷손이 앞쪽 합장점에 물리적으로 닿지 못한다. */
+    const shX = (shXOv !== undefined ? shXOv : shoulderX(front)), shY = shYBase;
     const armK2 = raging ? 0.9 : 1;   /* 분노는 몸 전체가 +18% 커지므로 팔은 상대적으로 얇게 */
     const uR = bodyW * (front ? 0.174 : 0.156) * bulk * armK2;
     const fR = bodyW * (front ? 0.188 : 0.166) * bulk * armK2;   /* 팔뚝: 0.21 → 0.188 */
@@ -7466,30 +7469,36 @@ function drawHulk(){
     let fT, bT; /* [x, y] 목표 */
     let palm = false;
     let hit = false;
+    let bShX;   /* 뒷팔 어깨 x (합장 때만 앞으로 말린다) */
     if (clapping) {
       palm = true;
       /* 합장점은 뒷팔 어깨에서도 닿는 거리여야 한다 — 멀면 뒷팔이 일직선으로 굳은 채
          손이 만나지 못한다. 준비 자세도 한쪽만 아래로 젖히면 막대기 두 개처럼 보이므로
          양팔 모두 위-바깥으로 들어올려 팔꿈치가 확실히 굽게 만든다. */
-      const meet = [bodyW * 0.20, shYBase + bodyH * 0.15];      /* 가슴 앞 합장점 */
+      /* 합장점은 두 팔이 거의 다 펴지는 거리(팔 길이의 88~95%)로 앞쪽 멀리 둔다 */
+      const meet = [bodyW * 1.02, shYBase + bodyH * 0.10];
       /* 활짝 벌리는 단계: 양팔을 좌우로 크게 편다 (어깨 높이 살짝 위, 팔꿈치는 굽은 채) */
-      const fOpen = [bodyW * 0.92, shYBase - bodyH * 0.14];     /* 앞팔: 앞으로 최대한 활짝 */
-      const bOpen = [-bodyW * 0.90, shYBase - bodyH * 0.13];    /* 뒷팔: 뒤로 최대한 활짝 */
+      const fOpen = [bodyW * 0.94, shYBase - bodyH * 0.03];     /* 앞팔: 앞으로 최대한 활짝 */
+      const bOpen = [-bodyW * 0.92, shYBase - bodyH * 0.02];    /* 뒷팔: 뒤로 최대한 활짝 */
       const idleF = [bodyW * 0.45, shYBase + armLenU * 1.15];
       const idleB = [-bodyW * 0.42, shYBase + armLenU * 1.15];
+      const bShOpen = shoulderX(false), bShClose = bodyW * 0.36;
       if (clapPh < 0.4) {
         const e = easeOut3(clapPh / 0.4);
         fT = [lerp2(idleF[0], fOpen[0], e), lerp2(idleF[1], fOpen[1], e)];
         bT = [lerp2(idleB[0], bOpen[0], e), lerp2(idleB[1], bOpen[1], e)];
+        bShX = bShOpen;
       } else if (clapPh < 0.62) {
         const e = easeIn3((clapPh - 0.4) / 0.22);
         fT = [lerp2(fOpen[0], meet[0] + bodyW * 0.04, e), lerp2(fOpen[1], meet[1], e)];
         bT = [lerp2(bOpen[0], meet[0] - bodyW * 0.06, e), lerp2(bOpen[1], meet[1], e)];
+        bShX = lerp2(bShOpen, bShClose, e);
       } else {
         hit = true;
         const tremor = Math.sin(G.time * 60) * 2;
         fT = [meet[0] + bodyW * 0.04 + tremor, meet[1]];
         bT = [meet[0] - bodyW * 0.06 - tremor, meet[1]];
+        bShX = bShClose;
       }
     } else {
       /* 해머: 두 주먹 맞잡고 머리 위 → 전방 아래로 내려찍기 */
@@ -7520,7 +7529,7 @@ function drawHulk(){
       fT = [M[0] + bodyW * 0.06, M[1]];
       bT = [M[0] - bodyW * 0.08, M[1] + 4];
     }
-    armTo(false, bT[0], bT[1], 1, palm);
+    armTo(false, bT[0], bT[1], 1, palm, bShX);
     const handPos = armTo(true, fT[0], fT[1], 1, palm);   /* 좌우 팔꿈치가 반대로 꺾이면 지그재그로 보인다 */
     /* 임팩트 섬광 */
     if (hit) {
