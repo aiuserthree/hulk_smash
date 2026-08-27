@@ -1427,20 +1427,21 @@ const H = {
   rageTick: 0,
   baseH: 130, baseW: 88,
 };
-/* 분노 변신 시 덩치 35% 팽창 + 거인화 강화 */
+/* 분노 변신 시 덩치 팽창 — PC 35%, 모바일은 화면이 작아 16%로 완화 */
 function hulkScale(){
   /* 거대화 버프: 시작·끝 0.35초 부드럽게 커졌다 줄어듦 (연장해도 스냅 없음) */
   const giant = G.buffGiantT > 0
     ? 1 + 0.25 * clamp(G.buffGiantT / 0.35, 0, 1) * clamp(G.buffGiantIn / 0.35, 0, 1)
     : 1;
+  const touch = document.body.classList.contains('touchmode');
   const raw = (1 + Math.min(G.stage - 1, 9) * 0.11)
-    * (1 + 0.35 * G.rageRamp)
+    * (1 + (touch ? 0.16 : 0.35) * G.rageRamp)
     * (1 + 0.06 * G.upgrades.size)
     * giant;
-  /* 화면이 좁거나 모바일이면 덩치 상한을 낮춰 화면을 꽉 채우지 않게 */
+  /* 모바일에서만 덩치 상한 (PC는 창 크기와 무관하게 원래 크기 유지) */
+  if (!touch) return raw;
   const room = clamp(viewW / 1300, 0.45, 1);
-  let cap = 3.4 * (0.55 + 0.45 * room);
-  if (document.body.classList.contains('touchmode')) cap *= 0.78;
+  const cap = 3.4 * (0.55 + 0.45 * room) * 0.72;
   return Math.min(raw, cap);
 }
 function hulkH(){ return H.baseH * hulkScale(); }
