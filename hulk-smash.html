@@ -1633,7 +1633,7 @@ const H = {
 /* 분노 변신 시 덩치 팽창 — PC 35%, 모바일은 화면이 작아 16%로 완화 */
 function hulkScale(){
   const touch = document.body.classList.contains('touchmode');
-  const raw = (1 + Math.min(G.stage - 1, 9) * 0.11)
+  const raw = (1 + Math.min(G.stage - 1, 4) * 0.11)   /* 덩치 성장은 STAGE 5에서 멈춘다 */
     * (1 + (touch ? 0.14 : 0.18) * G.rageRamp)
     * (1 + 0.06 * G.upgrades.size);
   /* 모바일에서만 덩치 상한 (PC는 창 크기와 무관하게 원래 크기 유지) */
@@ -4812,7 +4812,7 @@ function showClear(){
   }
   ui.nextBtn.textContent = document.body.classList.contains('touchmode')
     ? '다음 동네 부수러 →' : '다음 동네 부수러 →   [Space]';
-  ui.growthMsg.textContent = G.stage < 10
+  ui.growthMsg.textContent = G.stage < 5
     ? '💪 헐크가 더 커졌다! 덩치 +11%, 파워 UP!'
     : '💪 파워가 더 강해졌다!';
   /* 영구 기록 갱신 */
