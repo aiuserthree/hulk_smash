@@ -1642,7 +1642,7 @@ const H = {
 function hulkScale(){
   const touch = document.body.classList.contains('touchmode');
   const raw = (1 + Math.min(G.stage - 1, 4) * 0.11)   /* 덩치 성장은 STAGE 5에서 멈춘다 */
-    * (1 + (touch ? 0.08 : 0.10) * G.rageRamp)
+    * (1 + (touch ? 0.11 : 0.14) * G.rageRamp)
     * (1 + 0.06 * G.upgrades.size);
   /* 모바일에서만 덩치 상한 (PC는 창 크기와 무관하게 원래 크기 유지) */
   if (!touch) return raw;
