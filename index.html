@@ -1578,6 +1578,7 @@ const G = {
   drops: [],            // 파워업 드롭
   buffAtkT: 0,          // 공격력 2배 버프
   autoSkill: false,     // 스킬 자동 사용 토글
+  autoBusyT: 0,         // 자동 스킬이 동작 상태 때문에 대기한 시간
   autoT: 0,             // 자동 사용 간격 타이머
   stormT: 0,            // 낙뢰 폭풍 지속(하늘 어두워짐)
   boltFlash: 0,         // 낙뢰 착탄 푸른 섬광
@@ -3763,7 +3764,11 @@ function autoCast(dt){
   if (!G.autoSkill || !autoAvailable() || G.state !== 'play') return;
   G.autoT -= dt;
   if (G.autoT > 0) return;
-  if (H.slam || H.clapT > 0 || H.dashT > 0 || H.spinT > 0 || H.stompN > 0) { G.autoT = 0.1; return; }
+  if (H.slam || H.clapT > 0 || H.dashT > 0 || H.spinT > 0 || H.stompN > 0) {
+    /* 안전망: 동작 상태에 갇혀도 3초 넘게 대기하면 그냥 진행한다 (자동 스킬 영구 정지 방지) */
+    G.autoBusyT = (G.autoBusyT || 0) + dt + 0.1;
+    if (G.autoBusyT < 3) { G.autoT = 0.1; return; }
+  } else G.autoBusyT = 0;
   const ready = [];
   if (hasSkill('rage') && G.rage >= 100 && G.rageT <= 0) ready.push('rage');
   if (hasSkill('slam') && H.slamCd <= 0) ready.push('slam');
@@ -4572,7 +4577,9 @@ function update(dt){
       H.x = gate;
       if (H.vx > 0) H.vx = 0;
       if (H.dashT > 0) H.dashT = 0;          /* 벽에 막히면 돌진도 멈춤 */
-      if (H.stompN > 0) H.stompT = Math.max(H.stompT, 0.12);
+      /* 스톰프 타이머는 건드리지 않는다 — 매 프레임 되돌리면 stompN이 영영 0이 되지 않아
+         스톰프가 끝나지 않고, autoCast가 stompN>0에서 계속 빠져나가 자동 스킬이 멈춘다.
+         전진은 위의 H.x 고정으로 이미 막혀 있으므로 제자리 스톰프로 진행된다. */
       if (G.state === 'play') {
         G.blockT = (G.blockT || 0) - dt;
         if (G.blockT <= 0) {
