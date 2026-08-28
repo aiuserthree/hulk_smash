@@ -1566,6 +1566,7 @@ const G = {
   maxCombo: 0,
   comboPop: 0,          // 콤보 숫자 팝 애니메이션
   feverT: 0,            // 피버 타임 남은 시간
+  feverCd: 0,           // 피버 재발동 쿨타임
   drops: [],            // 파워업 드롭
   buffAtkT: 0,          // 공격력 2배 버프
   autoSkill: false,     // 스킬 자동 사용 토글
@@ -1934,7 +1935,7 @@ function genStage(n){
   G.hitStop = 0; G.slowMo = 0; G.camKick = 0; G.zoomKick = 0;
   G.destroyed = 0; G.stageScore = 0; G.stageDestroyed = 0; G.stageTime = 0;
   G.combo = 0; G.comboT = 0; G.maxCombo = 0; G.comboPop = 0;
-  G.feverT = 0; G.drops = []; G.buffAtkT = 0;
+  G.feverT = 0; G.feverCd = 0; G.drops = []; G.buffAtkT = 0;
   G.stormT = 0; G.boltFlash = 0;
   G.flares = []; G.rays = []; G.tintA = 0;
   G.rageT = 0; G.rageRamp = 0; G.clearT = 0;
@@ -3191,13 +3192,14 @@ function addScore(base){
   return gain;
 }
 const COMBO_WINDOW = 3.5;   // 콤보가 끊기기까지의 여유 시간(초)
+const FEVER_CD = 12;        // 피버 종료 후 재발동까지의 쿨타임(초)
 function bumpCombo(){
   G.combo++; G.comboT = COMBO_WINDOW;
   G.comboPop = 0.22;
   if (G.combo > G.maxCombo) G.maxCombo = G.combo;
   if (G.combo >= 5 && G.combo % 5 === 0) SND.comboDing(G.combo);
   /* 피버 임계 도달 → 피버 타임 */
-  if (G.combo >= feverNeed() && G.feverT <= 0) startFever();
+  if (G.combo >= feverNeed() && G.feverT <= 0 && G.feverCd <= 0) startFever();
 }
 
 /* 피버 발동 콤보: 스테이지 사물 수의 70% (12~50) — 어느 스테이지든 달성 가능.
@@ -3218,7 +3220,10 @@ function endFever(){
   const bonus = G.combo * 100;
   G.score += bonus; G.stageScore += bonus;
   popup(H.x, GROUND - hulkH() - 70, '+' + bonus + ' FEVER BONUS', 32, '#ffd23f');
-  G.combo = 0; G.comboT = 0;
+  /* 콤보는 끊지 않는다 — 대신 쿨타임으로 즉시 재발동(무한 피버)을 막는다.
+     예전엔 여기서 콤보를 0으로 만들어, 계속 부수는 중에도 x1로 떨어졌다. */
+  G.feverCd = FEVER_CD;
+  G.comboT = Math.max(G.comboT, COMBO_WINDOW);   /* 피버 중엔 타이머가 멈춰 있었으므로 되살려 준다 */
   updateHUD();
 }
 
@@ -4025,6 +4030,7 @@ function update(dt){
     });
     if (G.feverT <= 0) endFever();
   } else if (G.comboT > 0) { G.comboT -= dt; if (G.comboT <= 0) G.combo = 0; }
+  if (G.feverCd > 0) G.feverCd = Math.max(0, G.feverCd - dt);
   if (G.comboPop > 0) G.comboPop -= dt;
   /* 파워업 버프 타이머 + 드롭 */
   if (G.buffAtkT > 0) G.buffAtkT -= dt;
@@ -5618,7 +5624,19 @@ function render(){
       ctx.fillRect(W / 2 - bw / 2, 92, bw * frac, 5);
       /* 피버 임박 안내 */
       const left = feverNeed() - G.combo;
-      if (left > 0 && left <= 10) {
+      if (G.feverCd > 0) {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = '400 13px "Black Han Sans", sans-serif';
+        ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(22,22,31,.8)';
+        const msg = 'FEVER 재충전 ' + Math.ceil(G.feverCd);
+        ctx.strokeText(msg, W / 2, 110);
+        ctx.fillStyle = 'rgba(255,210,63,.75)';
+        ctx.fillText(msg, W / 2, 110);
+        ctx.restore();
+      } else if (left > 0 && left <= 10) {
         ctx.save();
         ctx.textAlign = 'center';
         ctx.font = '400 13px "Black Han Sans", sans-serif';
