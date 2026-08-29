@@ -2051,7 +2051,8 @@ function genStage(n){
     G.clouds.push({ x: rand(0, G.worldLen), y: rand(40, 220), s: rand(0.6, 1.6), v: rand(3, 10) });
   }
 
-  H.x = 200; H.y = GROUND; H.vx = 0; H.vy = 0; H.face = 1;
+  H.x = G.bonus ? 380 : 200;   /* 보너스 판은 화면 중앙에서 솟는 좀비가 걸어올 여유를 둔다 */
+  H.y = GROUND; H.vx = 0; H.vy = 0; H.face = 1;
   H.onGround = true; H.punchT = 0; H.slam = 0; H.clapT = 0; H.dashT = 0;
   H.punchCd = 0; H.slamCd = 0; H.clapCd = 0; H.dashCd = 0;
   H.punchSeq = 0; H.punchChainT = 0;
@@ -4485,7 +4486,11 @@ function update(dt){
       if (G.zombieSpawnT <= 0) {
         G.zombieSpawnT = G.bonusRate;
         const before = G.zombies.length;
-        spawnZombie(1, 'hulkz', G.worldLen / 2 + rand(-430, 430));   /* 아레나 한가운데 땅에서 솟아오른다 */
+        /* 화면 한가운데 땅에서 솟아오른다 (아레나 좌표가 아니라 보이는 화면 기준).
+           헐크 바로 위에 튀어나오지 않도록 최소 간격은 띄운다. */
+        let sx = G.camX + viewW * 0.5 + rand(-190, 190);
+        if (Math.abs(sx - H.x) < 250) sx = H.x + (sx >= H.x ? 250 : -250);
+        spawnZombie(1, 'hulkz', sx);
         if (G.zombies.length > before) {
           G.bonusSpawned++;
           if (Math.random() < 0.3) SND.groan();
