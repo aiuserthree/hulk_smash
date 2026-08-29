@@ -2524,8 +2524,11 @@ function pickZHulk(){
 const ZSPR = {};                 /* 변종id → [프레임 캔버스] */
 const ZSPR_N = 10;               /* 걸음 사이클 프레임 수 */
 const ZSPR_H = 260;              /* 기준 bodyH (px) */
-const ZSPR_W = 460, ZSPR_CH = 380;
-const ZSPR_OX = ZSPR_W * 0.30, ZSPR_OY = ZSPR_CH - 20;   /* 스프라이트 내 발 위치 */
+/* 캔버스가 크면 그만큼 blit 픽셀이 늘어난다 — 실루엣에 딱 맞게 좁힌다.
+   가로: 뒤쪽 몸통 0.6*bodyW + 앞으로 뻗은 팔(어깨 0.40*bodyW + 팔길이 0.485*bodyH + 주먹) */
+const ZSPR_W = 430, ZSPR_CH = 362;
+const ZSPR_OX = 152, ZSPR_OY = ZSPR_CH - 46;             /* 스프라이트 내 발 위치
+   (왼쪽은 뒤로 뻗은 다리, 아래는 발 두께만큼 여유가 필요하다) */
 function zSprites(V){
   if (ZSPR[V.id]) return ZSPR[V.id];
   const q = 2;                   /* 2배로 구워 축소 blit — 확대해도 뭉개지지 않게 */
@@ -2561,11 +2564,22 @@ function zSprites(V){
 function drawZombieHulk(z){
   const V = ZHULK_VARIANTS.find(v => v.id === z.zv) || ZHULK_VARIANTS[0];
   const fr = zSprites(V);
+  if (z.riseT <= 0 && z.state !== 'launched') {   /* 바닥 그림자는 월드에 직접 */
+    ctx.fillStyle = 'rgba(22,22,31,.26)';
+    ctx.beginPath();
+    ctx.ellipse(z.x, GROUND + 3, z.h * 0.30, z.h * 0.05, 0, 0, 7);
+    ctx.fill();
+  }
   const idx = (Math.floor(z.t * 7 / Math.PI * ZSPR_N) % ZSPR_N + ZSPR_N) % ZSPR_N;
   const spr = fr[idx];
   const k = z.h / ZSPR_H;
   ctx.save();
-  ctx.translate(z.x, z.y);
+  if (z.riseT > 0) {   /* 지면 아래는 보이지 않게 잘라낸다 */
+    ctx.beginPath();
+    ctx.rect(z.x - 600, GROUND - 4000, 1200, 4000 + 4);
+    ctx.clip();
+  }
+  ctx.translate(z.x, z.y + (z.riseT > 0 ? (z.riseT / ZRISE) * z.h * 1.25 : 0));
   if (z.state === 'launched') ctx.rotate(z.rot || 0);
   if (z.face < 0) ctx.scale(-1, 1);
   ctx.globalAlpha = z.state === 'flee' ? 0.9 : 1;
@@ -2586,8 +2600,9 @@ function pickZombieKind(){
   /* 기본 워커가 절반 정도를 차지하도록 가중 */
   return Math.random() < 0.45 ? 'walker' : pick(pool);
 }
-function spawnZombie(side, forceKind){
-  if (G.zombies.length >= (G.bonus ? 34 : 26)) return;
+const ZRISE = 0.45;   /* 땅을 뚫고 솟아오르는 시간 */
+function spawnZombie(side, forceKind, atX){
+  if (G.zombies.length >= (G.bonus ? 26 : 26)) return;
   const kind = forceKind || pickZombieKind();
   const K = ZOMBIE_KINDS[kind];
   const isHulkz = kind === 'hulkz';
@@ -2595,8 +2610,10 @@ function spawnZombie(side, forceKind){
   const ZV = isHulkz ? pickZHulk() : null;
   const sz = ZV ? rand(ZV.sz[0], ZV.sz[1]) : 1;
   G.zombies.push({
-    x: G.camX + (side > 0 ? viewW + rand(20, 240) : -rand(20, 240)),
+    x: atX !== undefined ? clamp(atX, 200, G.worldLen - 200)
+                         : G.camX + (side > 0 ? viewW + rand(20, 240) : -rand(20, 240)),
     y: GROUND, vx: 0, vy: 0, rot: 0, vr: 0,
+    riseT: atX !== undefined ? ZRISE : 0,
     kind,
     speed: rand(130, 250) * K.spd * (ZV ? G.bonusSpd * ZV.spd * (1.3 - sz * 0.4) : 1), face: -side,
     h: rand(52, 68) * K.h * sz,
@@ -2640,6 +2657,47 @@ function hitZombies(lo, hi, dir){
         SND.roar();
         popup(H.x, GROUND - hulkH() - 90, '싹 다 쓸어버렸다!!', 44, '#a8e05a');
       }
+    }
+    /* ---- 좀비 헐크: 감마 폭발로 터진다 (덩치가 클수록 더 크게) ---- */
+    if (z.kind === 'hulkz') {
+      const V = ZHULK_VARIANTS.find(v => v.id === z.zv) || ZHULK_VARIANTS[0];
+      const P2 = V.def.P, ey = V.def.eye;
+      const sc = clamp(z.h / 130, 0.6, 1.9);            /* 덩치 배율 */
+      const cy = GROUND - z.h * 0.55;
+      popup(z.x + rand(-14, 14), GROUND - z.h - 46, '+' + gain, 20 + 10 * sc, ey);
+      /* 감마 코어가 터지며 팽창하는 빛 */
+      addFlare(z.x, cy, 105 * sc, hexA(P2.hi, 0.95), 0.3);
+      if (sc > 0.95) addRays(z.x, cy, 9, hexA(P2.hi, 0.95), 240 * sc, 0.26);
+      addRing(z.x, GROUND, 190 * sc, P2.base, 5);
+      addBurst(z.x, cy, 60 * sc);
+      screenTint(hexRGB(P2.base), Math.min(0.34, 0.12 * sc));
+      /* 몸이 조각나 사방으로 흩어진다 (변종 색 그대로) */
+      const nb = Math.min(Math.round(8 * sc), pCap() - G.particles.length);
+      for (let bi = 0; bi < nb; bi++) G.particles.push({
+        x: z.x + rand(-14, 14) * sc, y: cy + rand(-30, 30) * sc,
+        vx: d * rand(140, 620) + rand(-140, 140), vy: -rand(180, 620),
+        size: rand(5, 15) * sc, color: pick([P2.base, P2.mid, P2.dark, P2.hi]),
+        rot: rand(0, 6.3), vr: rand(-16, 16),
+        t: 0, life: rand(0.6, 1.25), type: 'chunk',
+      });
+      /* 감마 불티 */
+      const nsp = Math.min(Math.round(6 * sc), pCap() - G.particles.length);
+      for (let si = 0; si < nsp; si++) G.particles.push({
+        x: z.x, y: cy,
+        vx: rand(-380, 380), vy: -rand(120, 520),
+        size: rand(3, 6), color: pick([P2.hi, ey, '#fff8e7']),
+        rot: 0, vr: 0, t: 0, life: rand(0.3, 0.7), type: 'spark',
+      });
+      spawnBlood(z.x, cy, d, Math.round(12 * sc));
+      spawnBlood(z.x, cy, -d, Math.round(5 * sc));
+      addSplat(z.x + d * 24);
+      if (sc > 1.1) { addSplat(z.x - d * 28); spawnRocks(z.x, Math.round(4 * sc), 40 * sc, 420); }
+      spawnDust(z.x, GROUND, Math.round(4 * sc), 30 * sc);
+      shake(4 + 7 * sc);
+      if (sc > 1.15) { impact(0.045); zoomKick(0.035); }
+      if (Math.random() < 0.06) spawnDrop(z.x);
+      if (G.rageT > 0) G.rageT = Math.min(G.rageT + 0.12, 10);
+      continue;
     }
     popup(z.x + rand(-16, 16), GROUND - z.h - 30, '+' + gain, 21, '#c9e6a0');
     /* 처치 폭발: 거구일수록 더 크게 터진다 */
@@ -2697,7 +2755,7 @@ function hitZombies(lo, hi, dir){
 
 /* ---------- 보스 (5스테이지마다 1:1 결투) ---------- */
 function updateHpHUD(){
-  if (!G.boss && !G.bonus && G.state !== 'defeat') { ui.hpWrap.classList.remove('on'); return; }
+  if (!G.boss && G.state !== 'defeat') { ui.hpWrap.classList.remove('on'); return; }
   ui.hpWrap.classList.add('on');
   const r = clamp(H.hp / H.maxHp, 0, 1);
   ui.hpFill.style.width = (r * 100) + '%';
@@ -4427,7 +4485,7 @@ function update(dt){
       if (G.zombieSpawnT <= 0) {
         G.zombieSpawnT = G.bonusRate;
         const before = G.zombies.length;
-        spawnZombie(1, 'hulkz');   /* 일반 판과 같이 오른쪽에서 왼쪽으로 밀려온다 */
+        spawnZombie(1, 'hulkz', G.worldLen / 2 + rand(-430, 430));   /* 아레나 한가운데 땅에서 솟아오른다 */
         if (G.zombies.length > before) {
           G.bonusSpawned++;
           if (Math.random() < 0.3) SND.groan();
@@ -4453,19 +4511,18 @@ function update(dt){
   }
   for (const z of G.zombies) {
     z.t += dt;
+    if (z.riseT > 0) {
+      z.riseT -= dt;
+      z.face = H.x > z.x ? 1 : -1;
+      if (!reducedMotion && Math.random() < dt * 40) spawnDust(z.x + rand(-20, 20), GROUND, 1, 26);
+      if (z.riseT <= 0) { addRing(z.x, GROUND, 90, '#8fa06a', 3); spawnDust(z.x, GROUND, 4, 40); }
+      continue;
+    }
     if (z.state === 'walk') {
       const zd = H.x > z.x ? 1 : -1;
       z.face = zd;
       z.x += zd * z.speed * dt;
-      /* 좀비 헐크는 헐크에게 달라붙어 후려친다 (무적 0.9초가 연타를 막아 준다) */
-      if (z.kind === 'hulkz' && G.state === 'play' && H.invulnT <= 0 &&
-          Math.abs(z.x - H.x) < hulkW() * 0.45 + z.w * 0.6) {
-        z.atkT = 0.34;                     /* 후려치는 모션 */
-        hulkKnock(-zd, Math.max(1, Math.round(G.bonusDmg * (z.dmgMul || 1))));
-        spawnBlood(H.x, GROUND - hulkH() * 0.5, -zd, 6);
-        SND.groan();
-      }
-      if (z.atkT > 0) z.atkT -= dt;
+      /* 보너스 판은 순수 학살 스테이지 — 좀비가 달라붙어도 헐크 HP는 깎이지 않는다 */
     } else if (z.state === 'flee') {
       z.x += z.face * z.speed * 1.7 * dt;
       if (z.t > z.fleeUntil) z.dead = true;
@@ -5088,6 +5145,10 @@ function showClear(){
 /* ============================================================
    렌더링 (시네마틱 스타일)
    ============================================================ */
+function hexRGB(h){
+  const p = parseInt(h.slice(1), 16);
+  return ((p >> 16) & 255) + ',' + ((p >> 8) & 255) + ',' + (p & 255);
+}
 function hexA(h, a){
   const p = parseInt(h.slice(1), 16);
   return 'rgba(' + ((p >> 16) & 255) + ',' + ((p >> 8) & 255) + ',' + (p & 255) + ',' + a + ')';
@@ -7321,15 +7382,17 @@ function drawHulk(){
     ctx.restore();
   }
 
-  /* 바닥 그림자 */
-  ctx.save();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = 'rgba(22,22,31,.28)';
-  const airH = GROUND - H.y;
-  ctx.beginPath();
-  ctx.ellipse(0, GROUND - H.y, bodyW * 0.62 * Math.max(0.35, 1 - airH / 900), 8 * s, 0, 0, 7);
-  ctx.fill();
-  ctx.restore();
+  /* 바닥 그림자 (좀비 스프라이트를 구울 땐 캔버스 가장자리에서 잘리므로 제외) */
+  if (!drawOv) {
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(22,22,31,.28)';
+    const airH = GROUND - H.y;
+    ctx.beginPath();
+    ctx.ellipse(0, GROUND - H.y, bodyW * 0.62 * Math.max(0.35, 1 - airH / 900), 8 * s, 0, 0, 7);
+    ctx.fill();
+    ctx.restore();
+  }
 
   /* 스쿼시 & 스트레치: 도약 시 늘어나고 착지 시 납작 */
   if (G.state !== 'defeat') {
