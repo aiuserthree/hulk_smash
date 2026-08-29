@@ -1983,10 +1983,10 @@ function genStage(n){
     /* 회차가 오를수록 수·속도·공격력·밀려오는 속도가 모두 오른다 */
     const wave = Math.floor(n / 10);            /* 1회차 = STAGE 10 */
     G.bonusWave = wave;
-    G.bonusTotal = 36 + (wave - 1) * 8;
-    G.bonusDmg = 6 + (wave - 1) * 1.6;
-    G.bonusSpd = 1 + Math.min(0.6, (wave - 1) * 0.07);
-    G.bonusRate = Math.max(0.11, 0.26 - (wave - 1) * 0.014);
+    G.bonusTotal = 40 + (wave - 1) * 14;
+    G.bonusDmg = 7 + (wave - 1) * 2.1;
+    G.bonusSpd = 1.12 + Math.min(0.7, (wave - 1) * 0.09);
+    G.bonusRate = Math.max(0.07, 0.17 - (wave - 1) * 0.012);
     G.bonusKilled = 0;
     G.bonusSpawned = 0;
   } else if (n % 5 === 0) {
