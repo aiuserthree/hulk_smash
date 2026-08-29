@@ -2654,9 +2654,38 @@ function hitZombies(lo, hi, dir){
       updateHUD();
       if (G.bonusKilled >= G.bonusTotal && G.state === 'play') {
         G.state = 'clearing';
-        G.clearT = 1.4;
-        SND.roar();
-        popup(H.x, GROUND - hulkH() - 90, '싹 다 쓸어버렸다!!', 44, '#a8e05a');
+        G.clearT = 2.0;
+        /* 마지막 한 마리 — 감마 폭발이 아레나 전체를 훑는다 */
+        const cy2 = GROUND - hulkH() * 0.55;
+        screenTint('160,255,90', 0.72);
+        G.flash = 0.3;
+        addFlare(H.x, cy2, 320, 'rgba(190,255,120,.95)', 0.7);
+        addFlare(H.x, cy2, 190, 'rgba(255,255,255,.95)', 0.45);
+        addRays(H.x, cy2, 14, 'rgba(220,255,160,.95)', 620, 0.55);
+        for (let i = 0; i < 5; i++) setTimeout(() => {
+          if (!G.rings) return;
+          addRing(H.x, GROUND, 260 + i * 190, i % 2 ? '#a8e05a' : '#fff8e7', 9 - i);
+        }, i * 110);
+        addCrack(H.x, 340);
+        addCrack(H.x - 340, 190);
+        addCrack(H.x + 340, 190);
+        spawnRocks(H.x, 18, 150, 820);
+        spawnDust(H.x, GROUND, 22, 180);
+        /* 남아 있던 잔불·좀비 잔해를 바깥으로 날려버리는 파면 */
+        for (const dd of [1, -1]) G.waves.push({
+          x: H.x, dir: dd, traveled: 20, range: aoeCap(1400), speed: 1500,
+          id: Math.random(), dmg: 999, gold: true, blast: true,
+        });
+        const ns = Math.min(26, pCap() - G.particles.length);
+        for (let i = 0; i < ns; i++) G.particles.push({
+          x: H.x + rand(-40, 40), y: cy2 + rand(-60, 60),
+          vx: rand(-620, 620), vy: -rand(160, 720),
+          size: rand(4, 9), color: pick(['#a8e05a', '#dfffb0', '#5f9433', '#fff8e7']),
+          rot: 0, vr: 0, t: 0, life: rand(0.5, 1.1), type: 'spark',
+        });
+        shake(34); impact(0.12); zoomKick(0.11); slowmo(0.5, true);
+        SND.roar(); SND.bigBoom(); SND.thunder();
+        popup(H.x, GROUND - hulkH() - 110, '싹 다 쓸어버렸다!!', 52, '#a8e05a');
       }
     }
     /* ---- 좀비 헐크: 감마 폭발로 터진다 (덩치가 클수록 더 크게) ---- */
@@ -5020,6 +5049,8 @@ const ACTIVES = [
 ];
 /* 클리어 화면 색종이 뿌리기 */
 const CONFETTI_COLS = ['#ffd23f', '#4cbb4f', '#ff4b33', '#39a9db', '#6c4fa8', '#fff8e7'];
+const CONFETTI_GAMMA = ['#a8e05a', '#5f9433', '#dfffb0', '#c08cff', '#fff8e7', '#7ce65a'];
+let confettiCols = CONFETTI_COLS;
 function spawnConfetti(count){
   const box = document.getElementById('confetti');
   if (!box) return;
@@ -5028,7 +5059,7 @@ function spawnConfetti(count){
   for (let i = 0; i < n; i++) {
     const el = document.createElement('i');
     el.style.left = (Math.random() * 100).toFixed(1) + '%';
-    el.style.background = CONFETTI_COLS[i % CONFETTI_COLS.length];
+    el.style.background = confettiCols[i % confettiCols.length];
     el.style.animationDuration = (2.2 + Math.random() * 2.4).toFixed(2) + 's';
     el.style.animationDelay = (Math.random() * 1.6).toFixed(2) + 's';
     el.style.width = (6 + Math.random() * 8).toFixed(0) + 'px';
@@ -5054,8 +5085,22 @@ function showClear(){
   G.state = 'clear';
   SND.fanfare();
   BGM.duck(0.09);
-  spawnConfetti(28);
-  ui.clearSub.textContent = 'STAGE ' + G.stage + (G.bossDefeated ? ' — BOSS 격파!!' : ' — ' + G.theme.name + ' 클리어');
+  /* 보너스 판은 감마 초록 테마로 갈아입는다 */
+  const title = document.querySelector('#clearOv .burst-title');
+  const dLabel = ui.stDestroyed ? ui.stDestroyed.nextElementSibling : null;
+  if (G.bonus) {
+    confettiCols = CONFETTI_GAMMA;
+    spawnConfetti(52);
+    if (title) { title.textContent = '싹 다 쓸어버렸다!!'; title.style.color = '#7ce65a'; }
+    if (dLabel) dLabel.textContent = '처치한 좀비';
+    ui.clearSub.textContent = 'STAGE ' + G.stage + ' — 좀비 헐크 ' + G.bonusTotal + '마리 소탕!!';
+  } else {
+    confettiCols = CONFETTI_COLS;
+    spawnConfetti(28);
+    if (title) { title.textContent = '싹 다 부쉈다!!'; title.style.color = 'var(--red)'; }
+    if (dLabel) dLabel.textContent = '부순 개수';
+    ui.clearSub.textContent = 'STAGE ' + G.stage + (G.bossDefeated ? ' — BOSS 격파!!' : ' — ' + G.theme.name + ' 클리어');
+  }
   /* 클리어 랭크 판정 + 보너스 */
   const rk = computeRank();
   const rankBonus = Math.round(G.stageScore * rk.info.mul);
@@ -5071,7 +5116,7 @@ function showClear(){
       + '<div class="rkbonus">랭크 보너스 +' + rankBonus.toLocaleString() + '</div>';
     setTimeout(() => SND.unlock(), 520);
   }
-  countUp(ui.stDestroyed, G.stageDestroyed, 700);
+  countUp(ui.stDestroyed, G.bonus ? G.bonusKilled : G.stageDestroyed, 700);
   countUp(ui.stCombo, G.maxCombo, 850);
   countUp(ui.stScore, G.stageScore, 1100, true);
   /* 스탯 카드가 하나씩 튀어나오게 */
