@@ -2020,6 +2020,7 @@ function genStage(n){
       hitFlash: 0, attackCd: 1.8,
       lastWave: -1, lastDash: -1, hitHulk: false,
       chargeDir: -1, dieT: 0, rot: 0, walkT: 0,
+      eyeGlow: 0, snapGlow: 0, snapWarned: false, rampage: 0, rampaging: false, spread: false,
       airY: 900, lvx: 0, lvy: 0, shots: 0, shotT: 0, recoil: 0,
     };
     popup(G.worldLen / 2 - 120, GROUND - 380, bname + '!!', 60, '#ff4b33');
@@ -2813,30 +2814,108 @@ function updateBoss(dt){
         if (Math.random() < dt * 1.6) { SND.step(); shake(1.5); }
       }
       if (b.attackCd <= 0) {
+        const r = Math.random();
         if (b.type === 'mech') {
-          if (adx < 280) { b.state = 'windup'; b.stateT = 0.6; }
+          /* 센티넬: 광학 빔이 주무기 — 멀면 빔, 붙으면 후려치기 */
+          if (r < 0.55) { b.state = 'beamPrep'; b.stateT = 0.75; }
+          else if (adx < 280) { b.state = 'windup'; b.stateT = 0.6; }
           else { b.state = 'chargePrep'; b.stateT = 0.65; }
         } else if (b.type === 'beast') {
-          if (adx < 280) { b.state = 'windup'; b.stateT = 0.6; }
-          else if (Math.random() < 0.5) { b.state = 'throw'; b.stateT = 0.7; }
-          else { b.state = 'leapPrep'; b.stateT = 0.5; }
+          /* 어보미네이션: 짐승처럼 달려들고 도약해 내리찍는다 (연속 돌진) */
+          if (adx < 280) { b.state = 'windup'; b.stateT = 0.55; }
+          else if (r < 0.5) { b.state = 'leapPrep'; b.stateT = 0.42; }
+          else { b.state = 'rampagePrep'; b.stateT = 0.5; b.rampage = 2 + Math.min(2, b.tier); }
         } else if (b.type === 'golem') {
-          /* 옵시디언: 느리지만 단단한 근접형 — 스톰프 · 바위 투척 · 돌진 */
-          if (adx < 300) { b.state = 'windup'; b.stateT = 0.7; }
-          else if (Math.random() < 0.45) { b.state = 'throw'; b.stateT = 0.8; }
+          /* 타노스: 인피니티 건틀릿 — 손가락을 튕겨 아레나 전체에 충격파 */
+          if (r < 0.5) { b.state = 'snapPrep'; b.stateT = 1.05; }
+          else if (adx < 300) { b.state = 'windup'; b.stateT = 0.7; }
+          else if (r < 0.78) { b.state = 'throw'; b.stateT = 0.8; }
           else { b.state = 'chargePrep'; b.stateT = 0.75; }
         } else if (b.type === 'queen') {
-          /* 헤카테: 좀비를 부르고 독 포탄을 쏘는 원거리형 */
-          if (adx < 240) { b.state = 'leapPrep'; b.stateT = 0.5; }
-          else if (Math.random() < 0.5) { b.state = 'volley'; b.shots = 2; b.shotT = 0.36; }
+          /* 닥터 둠: 둠봇을 부르고 마법 볼트를 연발하는 원거리형 */
+          if (r < 0.55) { b.state = 'volley'; b.shots = 3 + Math.min(2, b.tier); b.shotT = 0.3; }
+          else if (adx < 240) { b.state = 'leapPrep'; b.stateT = 0.5; }
           else { b.state = 'throw'; b.stateT = 0.7; }
-        } else { /* tank */
-          if (adx < 260) { b.state = 'chargePrep'; b.stateT = 0.7; }
-          else { b.state = 'volley'; b.shots = 3; b.shotT = 0.3; }
+        } else { /* tank = 모독: 이마 캐논 확산 사격 */
+          if (adx < 220 && r < 0.3) { b.state = 'chargePrep'; b.stateT = 0.7; }
+          else { b.state = 'volley'; b.shots = 3; b.shotT = 0.3; b.spread = true; }
         }
       }
       break;
     }
+    /* ---- 센티넬: 광학 빔 ---- */
+    case 'beamPrep':
+      b.stateT -= dt;
+      b.eyeGlow = 1 - Math.max(0, b.stateT) / 0.75;
+      if (Math.random() < dt * 20) spawnSparks(b.x + b.face * b.w * 0.3, GROUND - b.h * 0.88, b.face, 2, ['#7fd4ff', '#cdefff']);
+      if (b.stateT <= 0) {
+        b.state = 'beam'; b.stateT = 1.05; b.beamHit = false;
+        SND.thunder();
+        addFlare(b.x + b.face * b.w * 0.3, GROUND - b.h * 0.88, 190, 'rgba(120,215,255,.9)', 0.3);
+      }
+      break;
+    case 'beam': {
+      b.stateT -= dt;
+      b.eyeGlow = 1;
+      const by = GROUND - b.h * 0.88;
+      /* 빔 진로에 서 있으면 지진다 — 점프로 피할 수 있다 */
+      if (H.onGround && Math.sign(H.x - b.x) === b.face && Math.abs(H.x - b.x) < 1400) {
+        hulkKnock(b.face, 9 + b.atkBonus);
+      }
+      if (Math.random() < dt * 30) spawnSparks(H.x, GROUND - 20, -b.face, 3, ['#7fd4ff', '#fff8e7']);
+      shake(2);
+      if (b.stateT <= 0) {
+        b.eyeGlow = 0;
+        b.state = 'recover'; b.stateT = 0.7;
+        b.attackCd = rand(1.7, 2.5) * b.cdScale;
+      }
+      break;
+    }
+    /* ---- 타노스: 인피니티 스냅 ---- */
+    case 'snapPrep':
+      b.stateT -= dt;
+      b.snapGlow = 1 - Math.max(0, b.stateT) / 1.05;
+      if (b.stateT <= 0.9 && !b.snapWarned) {
+        b.snapWarned = true;
+        popup(b.x, GROUND - b.h - 60, '이건 필연이다', 30, '#c08cff');
+      }
+      if (Math.random() < dt * 26) spawnSparks(b.x + b.face * b.w * 0.34, GROUND - b.h * 0.62, b.face, 2, ['#c08cff', '#ffd23f']);
+      if (b.stateT <= 0) {
+        b.state = 'snap'; b.stateT = 0.5; b.snapWarned = false;
+        /* 손가락 튕김: 아레나 전체를 훑는 보라 충격파 */
+        screenTint('180,110,255', 0.62);
+        addFlare(b.x, GROUND - b.h * 0.6, 380, 'rgba(190,120,255,.95)', 0.5);
+        addRays(b.x, GROUND - b.h * 0.5, 14, 'rgba(220,180,255,.95)', 520, 0.4);
+        addRing(b.x, GROUND, 620, '#c08cff', 10);
+        addRing(b.x, GROUND, 380, '#fff8e7', 6);
+        addCrack(b.x, 320);
+        spawnRocks(b.x, 14, 130, 700);
+        shake(30); impact(0.12); zoomKick(0.09);
+        SND.bigBoom(); SND.thunder();
+        /* 땅에 붙어 있으면 반드시 맞는다 — 점프가 유일한 회피 */
+        if (H.onGround) hulkKnock(Math.sign(H.x - b.x) || 1, 22 + b.atkBonus);
+        hitZombies(b.x - 900, b.x + 900, 0);
+      }
+      break;
+    case 'snap':
+      b.stateT -= dt;
+      b.snapGlow = Math.max(0, b.stateT / 0.5);
+      if (b.stateT <= 0) {
+        b.snapGlow = 0;
+        b.state = 'recover'; b.stateT = 1.1;   /* 큰 기술 뒤 큰 빈틈 */
+        b.attackCd = rand(2.2, 3.0) * b.cdScale;
+      }
+      break;
+    /* ---- 어보미네이션: 연속 돌진 ---- */
+    case 'rampagePrep':
+      b.stateT -= dt;
+      if (Math.random() < dt * 22) spawnDust(b.x - b.face * b.w * 0.3, GROUND, 1, 20);
+      if (b.stateT <= 0) {
+        b.state = 'chargePrep'; b.stateT = 0.28;   /* 짧은 예비동작으로 곧장 돌진 */
+        b.rampaging = true;
+        SND.groan();
+      }
+      break;
     case 'throw':
       b.stateT -= dt;
       if (b.stateT <= 0) {
@@ -2894,7 +2973,9 @@ function updateBoss(dt){
         b.shotT = 0.38;
         b.recoil = 0.15;
         const mx = b.x + b.face * b.w * 0.42, my = GROUND - b.h * 0.85;
-        spawnProj('shell', b.x - b.face * 20, my, H.x + rand(-60, 60), 0.9, 14 + b.atkBonus);
+        const aim = b.spread ? H.x + (b.shots - 1) * b.face * 150 + rand(-30, 30)
+                             : H.x + rand(-60, 60);
+        spawnProj('shell', b.x - b.face * 20, my, aim, 0.9, 14 + b.atkBonus);
         /* 총구 화염 + 연기 링 */
         addFlare(mx, my, 150, 'rgba(255,180,70,.9)', 0.22);
         addRays(mx, my, 7, 'rgba(255,220,140,.9)', 170, 0.18);
@@ -2904,6 +2985,7 @@ function updateBoss(dt){
         shake(7);
         zoomKick(0.03);
         if (b.shots === 0) {
+          b.spread = false;
           b.state = 'stunned'; b.stateT = 1.6; /* 재장전: 공략 타이밍 */
           popup(b.x, GROUND - b.h - 60, '재장전!', 24, '#ffd23f');
           b.attackCd = rand(1.6, 2.4) * b.cdScale;
@@ -2991,11 +3073,21 @@ function updateBoss(dt){
         zoomKick(0.07);
       }
       if (b.stateT <= 0 || b.x <= 131 || b.x >= G.worldLen - 131) {
-        b.state = 'stunned'; b.stateT = 1.8; /* 그로기: 2배 데미지 찬스 */
-        spawnSparks(b.x, GROUND - 120, -b.chargeDir, 9);
-        popup(b.x, GROUND - b.h - 60, '그로기!', 26, '#ffd23f');
-        SND.crash();
-        b.attackCd = rand(1.6, 2.4) * b.cdScale;
+        if (b.rampaging && b.rampage > 0) {
+          /* 어보미네이션: 짐승처럼 멈추지 않고 곧장 되돌아 달려든다 */
+          b.rampage--;
+          b.state = 'chargePrep'; b.stateT = 0.26;
+          b.hitHulk = false;
+          spawnDust(b.x, GROUND, 6, 50);
+          SND.groan();
+        } else {
+          b.rampaging = false;
+          b.state = 'stunned'; b.stateT = 1.8; /* 그로기: 2배 데미지 찬스 */
+          spawnSparks(b.x, GROUND - 120, -b.chargeDir, 9);
+          popup(b.x, GROUND - b.h - 60, '그로기!', 26, '#ffd23f');
+          SND.crash();
+          b.attackCd = rand(1.6, 2.4) * b.cdScale;
+        }
       }
       break;
     }
@@ -6402,11 +6494,40 @@ function drawBoss(b){
   ctx.fill();
   ctx.scale(b.face, 1);
   if (b.state === 'dying') ctx.rotate(-b.rot);
+  /* 센티넬: 눈에서 뻗는 광학 빔 (몸보다 아래 레이어) */
+  if (b.state === 'beam') {
+    const by = -b.h * 0.88, bx0 = b.w * 0.30;
+    const len = 1500, th = b.h * 0.07 * (0.75 + Math.sin(b.t * 40) * 0.25);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const bg = ctx.createLinearGradient(bx0, by, bx0 + len, by);
+    bg.addColorStop(0, 'rgba(190,240,255,.95)');
+    bg.addColorStop(0.25, 'rgba(90,190,255,.75)');
+    bg.addColorStop(1, 'rgba(60,150,255,0)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(bx0, by - th, len, th * 2);
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.fillRect(bx0, by - th * 0.28, len * 0.75, th * 0.56);
+    ctx.restore();
+  }
   if (b.type === 'beast') drawBeastBody(b);
   else if (b.type === 'tank') drawTankBody(b);
   else if (b.type === 'golem') drawGolemBody(b);
   else if (b.type === 'queen') drawQueenBody(b);
   else drawMechBody(b);
+  /* 타노스: 인피니티 건틀릿 광휘 */
+  if (b.snapGlow > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const gx = b.w * 0.34, gy = -b.h * 0.62, gr = b.w * 0.5 * (0.6 + b.snapGlow * 0.9);
+    const gg = ctx.createRadialGradient(gx, gy, 2, gx, gy, gr);
+    gg.addColorStop(0, 'rgba(255,240,190,' + (0.9 * b.snapGlow) + ')');
+    gg.addColorStop(0.4, 'rgba(200,130,255,' + (0.6 * b.snapGlow) + ')');
+    gg.addColorStop(1, 'rgba(150,80,255,0)');
+    ctx.fillStyle = gg;
+    ctx.beginPath(); ctx.arc(gx, gy, gr, 0, 7); ctx.fill();
+    ctx.restore();
+  }
   /* 피격 플래시 */
   if (b.hitFlash > 0) {
     ctx.globalAlpha = Math.max(0, b.hitFlash * 6);
