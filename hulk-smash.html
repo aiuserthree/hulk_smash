@@ -2892,6 +2892,14 @@ function hitBoss(lo, hi, dmg, srcId, srcField){
   updateHUD();
   return true;
 }
+/* 빌런별 격파 연출 — 색과 마지막 대사가 다르다 */
+const BOSS_FX = {
+  mech:  { col:'#7fd4ff', rgb:'120,215,255', hi:'#dff2ff', line:'MUTANT THREAT... TERMINATED' },
+  beast: { col:'#ff6a4a', rgb:'255,106,74',  hi:'#ffd0c0', line:'크아아아악…!!' },
+  tank:  { col:'#ffb14a', rgb:'255,177,74',  hi:'#ffe6b0', line:'시스템… 다운' },
+  golem: { col:'#c08cff', rgb:'192,140,255', hi:'#ecd9ff', line:'나는… 필연이었다' },
+  queen: { col:'#9dff6a', rgb:'157,255,106', hi:'#dfffb0', line:'둠은… 죽지 않는다' },
+};
 function updateBoss(dt){
   const b = G.boss;
   b.t += dt;
@@ -3280,7 +3288,14 @@ function updateBoss(dt){
       if (b.dieT % 0.22 < dt && G.particles.length < pCap() - 20) {
         fireball(b.x + rand(-80, 80), GROUND - rand(50, b.h * 0.9), false);
         b.hitFlash = 0.09;
-        spawnSparks(b.x + rand(-60, 60), GROUND - rand(60, 180), Math.random() < 0.5 ? 1 : -1, 5);
+        const FXd = BOSS_FX[b.type] || BOSS_FX.mech;
+        spawnSparks(b.x + rand(-60, 60), GROUND - rand(60, 180), Math.random() < 0.5 ? 1 : -1, 5,
+                    [FXd.col, FXd.hi, '#fff8e7']);
+        /* 몸에서 새어 나오는 에너지 블룸 (점점 잦아진다) */
+        addFlare(b.x + rand(-70, 70), GROUND - rand(60, b.h * 0.85),
+                 55 + b.dieT * 32, hexA(FXd.col, 0.62), 0.2);
+        if (b.dieT > 1.2 && Math.random() < 0.5)
+          addRays(b.x, GROUND - b.h * 0.5, 6, hexA(FXd.hi, 0.8), 150 + b.dieT * 70, 0.2);
         /* 죽어가며 체액이 계속 뿜어져 나옴 */
         spawnBlood(b.x + rand(-70, 70), GROUND - rand(60, b.h * 0.8),
                    Math.random() < 0.5 ? 1 : -1, 5,
@@ -3317,9 +3332,36 @@ function updateBoss(dt){
           size: rand(18, 32), color: '', rot: 0, vr: 0,
           t: 0, life: rand(1.2, 2.0), type: 'smoke',
         });
-        addRing(b.x, GROUND, 320, '#ffd23f', 9);
-        addRing(b.x, GROUND, 210, '#ff9d5e', 6);
-        addRing(b.x, GROUND, 110, '#fff8e7', 4);
+        const FX = BOSS_FX[b.type] || BOSS_FX.mech;
+        /* 시간차로 겹겹이 퍼지는 충격파 (빌런 색 ↔ 흰색 교차) */
+        for (let i = 0; i < 6; i++) setTimeout(() => {
+          if (G.state === 'start') return;
+          addRing(b.x, GROUND, 150 + i * 170, i % 2 ? FX.col : '#fff8e7', 11 - i);
+        }, i * 95);
+        /* 하늘로 솟는 에너지 기둥 + 방사 광선 */
+        addFlare(b.x, GROUND - 150, 380, hexA(FX.col, 0.72), 0.6);
+        addFlare(b.x, GROUND - 90, 150, 'rgba(255,255,255,.7)', 0.3);
+        addRays(b.x, GROUND - 130, 14, hexA(FX.hi, 0.9), 700, 0.55);
+        addRays(b.x, GROUND - 300, 9, hexA(FX.col, 0.8), 440, 0.42);
+        screenTint(FX.rgb, 0.46);
+        addCrack(b.x, 360);
+        addCrack(b.x - 380, 200);
+        addCrack(b.x + 380, 200);
+        spawnRocks(b.x, 22, 170, 900);
+        /* 빌런 색 파편이 사방으로 */
+        const nc = Math.min(22, pCap() - G.particles.length);
+        for (let i = 0; i < nc; i++) G.particles.push({
+          x: b.x + rand(-60, 60), y: GROUND - rand(60, b.h),
+          vx: rand(-680, 680), vy: -rand(200, 780),
+          size: rand(5, 14), color: pick([FX.col, FX.hi, '#fff8e7']),
+          rot: rand(0, 6.3), vr: rand(-14, 14),
+          t: 0, life: rand(0.7, 1.4), type: 'chunk',
+        });
+        /* 잔해를 밀어내는 양방향 파면 */
+        for (const dd of [1, -1]) G.waves.push({
+          x: b.x, dir: dd, traveled: 20, range: aoeCap(1400), speed: 1400,
+          id: Math.random(), dmg: 1, gold: true, blast: true, fromBoss: true,
+        });
         /* 최종 폭발 체액 분수 + 바닥 얼룩 */
         const fluid = b.type === 'beast' ? BLOOD_RED : OIL_BLACK;
         const fcol = b.type === 'beast' ? '122,20,14' : '32,32,42';
@@ -3332,18 +3374,21 @@ function updateBoss(dt){
         addScorch(b.x, 240);
         addRubble(b.x, 210);
         SND.bigBoom(); SND.thunder();
-        shake(42);
-        zoomKick(0.12);
-        impact(0.18);
-        G.flash = 0.3;
-        if (G.rageT <= 0) slowmo(0.5);
+        shake(52);
+        zoomKick(0.16);
+        impact(0.2);
+        G.flash = 0.26;
+        slowmo(0.5, true);   /* 격파 순간은 분노 중에도 슬로모 */
         /* 헐크 승리 포효 */
         H.roarT = 0.7;
         G.rageGrinT = 1.2;
         const gain = addScore(5000);
-        popup(b.x, GROUND - 280, '+' + gain, 44, '#fff8e7');
-        popup(H.x, GROUND - hulkH() - 100, 'BOSS DOWN!!', 58, '#4cbb4f');
+        popup(b.x, GROUND - 300, '+' + gain, 46, '#fff8e7');
+        popup(b.x, GROUND - 210, FX.line, 30, FX.col);          /* 빌런의 마지막 말 */
+        popup(H.x, GROUND - hulkH() - 100, 'BOSS DOWN!!', 62, '#4cbb4f');
+        setTimeout(() => { if (G.state !== 'start') SND.fanfare(); }, 380);
         SND.roar();
+        G.lastBossName = b.name; G.lastBossFx = FX;
         G.boss = null;
         G.state = 'clearing';
         G.clearT = 2.0;
@@ -5086,12 +5131,19 @@ function showClear(){
     if (title) { title.textContent = '싹 다 쓸어버렸다!!'; title.style.color = '#7ce65a'; }
     if (dLabel) dLabel.textContent = '처치한 좀비';
     ui.clearSub.textContent = 'STAGE ' + G.stage + ' — 좀비 헐크 ' + G.bonusTotal + '마리 소탕!!';
+  } else if (G.bossDefeated) {
+    const bf = G.lastBossFx || { col: '#ffd23f' };
+    confettiCols = CONFETTI_COLS;
+    spawnConfetti(44);
+    if (title) { title.textContent = (G.lastBossName || 'BOSS') + ' 격파!!'; title.style.color = bf.col; }
+    if (dLabel) dLabel.textContent = '부순 개수';
+    ui.clearSub.textContent = 'STAGE ' + G.stage + ' — 보스를 쓰러뜨렸다';
   } else {
     confettiCols = CONFETTI_COLS;
     spawnConfetti(28);
     if (title) { title.textContent = '싹 다 부쉈다!!'; title.style.color = 'var(--red)'; }
     if (dLabel) dLabel.textContent = '부순 개수';
-    ui.clearSub.textContent = 'STAGE ' + G.stage + (G.bossDefeated ? ' — BOSS 격파!!' : ' — ' + G.theme.name + ' 클리어');
+    ui.clearSub.textContent = 'STAGE ' + G.stage + ' — ' + G.theme.name + ' 클리어';
   }
   /* 클리어 랭크 판정 + 보너스 */
   const rk = computeRank();
