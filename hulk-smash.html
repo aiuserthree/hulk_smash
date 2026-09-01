@@ -4200,7 +4200,21 @@ function autoCast(dt){
 }
 /* 목표 바로 앞에서 멈추는 여유 — 벽에 밀착해 '부수고 지나가라!'가 반복되지 않게 */
 const AUTO_GAP = 6;
-/* 지금 다가갈 목표: 보스 > 아직 안 부순 사물 중 가장 가까운 것 (없으면 제자리) */
+/* 좀비 판은 앞뒤 양쪽에서 몰려온다 — 목표가 좌우로 흔들리지 않게 한 마리를 물고 간다 */
+let autoZ = null;
+function autoZombie(){
+  if (autoZ && (autoZ.dead || autoZ.state !== 'walk' || G.zombies.indexOf(autoZ) < 0)) autoZ = null;
+  let best = null, bestD = Infinity;
+  for (const z of G.zombies) {
+    if (z.dead || z.state !== 'walk') continue;   /* 날아간 놈·도망가는 놈은 쫓지 않는다 */
+    const d = Math.abs(z.x - H.x);
+    if (d < bestD) { bestD = d; best = z; }
+  }
+  /* 확실히 더 가까운 놈이 나왔을 때만 목표를 바꾼다 (거리가 비슷하면 제자리에서 흔들린다) */
+  if (!autoZ || (best && bestD < Math.abs(autoZ.x - H.x) - 90)) autoZ = best;
+  return autoZ;
+}
+/* 지금 다가갈 목표: 보스 > 안 부순 사물 > 좀비 (뒤에 있으면 돌아선다) */
 function autoTarget(){
   const b = G.boss;
   if (b && b.hp > 0 && b.state !== 'dying') {
@@ -4218,7 +4232,14 @@ function autoTarget(){
     const d = Math.abs(tx - H.x);
     if (d < bestD) { bestD = d; best = { x: tx, dir: ahead ? 1 : -1 }; }
   }
-  return best;
+  if (best) return best;
+  /* 부술 게 없는 좀비 판: 앞뒤 어느 쪽이든 가장 가까운 좀비 쪽으로 돌아서서 처리한다 */
+  const z = autoZombie();
+  if (z) {
+    const stand = hulkW() / 2 + z.w / 2 + 30;
+    return z.x >= H.x ? { x: z.x - stand, dir: 1 } : { x: z.x + stand, dir: -1 };
+  }
+  return null;
 }
 /* 자동 ON이면 오른쪽 버튼 없이 스스로 목표까지 걸어간다 */
 function autoWalk(){
