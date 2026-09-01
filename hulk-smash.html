@@ -651,7 +651,7 @@
       <div class="skill chip hidden" id="sk-roar"><span class="key">F</span><div class="name">포효</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip hidden" id="sk-spin"><span class="key">T</span><div class="name">토네이도</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
       <div class="skill chip hidden" id="sk-stomp"><span class="key">G</span><div class="name">스톰프</div><div class="cd"></div><div class="cdt"></div><span class="lv"></span></div>
-      <div class="skill chip hidden" id="sk-auto" title="스킬 자동 사용 (O)"><span class="key">O</span><div class="name">자동</div></div>
+      <div class="skill chip hidden" id="sk-auto" title="자동 진행 — 전진 + 스킬 자동 (O)"><span class="key">O</span><div class="name">자동</div></div>
     </div>
     <div id="muteBtn" class="chip" title="소리 켜기/끄기 (M)">🔊</div>
     <div id="pauseBtn" class="chip" title="일시정지 (P)">⏸</div>
@@ -701,7 +701,7 @@
           <div class="ctrlH">보상 · 편의</div>
           <div class="ctrlLine wrap">
             <span class="kb">Q E F T G</span><b>보스 보상 스킬 (누적)</b>
-            <span class="kb">O</span><b>자동 사용</b>
+            <span class="kb">O</span><b>자동 진행 (전진+스킬)</b>
             <span class="kb">P</span><b>일시정지</b>
             <span class="kb">M</span><b>음소거</b>
           </div>
@@ -1594,7 +1594,7 @@ const G = {
   feverCd: 0,           // 피버 재발동 쿨타임
   drops: [],            // 파워업 드롭
   buffAtkT: 0,          // 공격력 2배 버프
-  autoSkill: false,     // 스킬 자동 사용 토글
+  autoSkill: false,     // 자동 진행 토글 (전진 + 스킬)
   autoBusyT: 0,         // 자동 스킬이 동작 상태 때문에 대기한 시간
   autoT: 0,             // 자동 사용 간격 타이머
   stormT: 0,            // 낙뢰 폭풍 지속(하늘 어두워짐)
@@ -1685,10 +1685,12 @@ const hasSkill = s => G.stage >= UNLOCK_STAGE[s];
 const input = { left:false, right:false, punch:false };
 const pressQueue = [];      // 한 번 누름 액션
 /* 이동 입력 합성: 키보드·슬라이드 패드가 서로 덮어쓰지 않도록 소스별 추적 */
-const moveSrc = { kbL: false, kbR: false, padL: false, padR: false };
+const moveSrc = { kbL: false, kbR: false, padL: false, padR: false, autoL: false, autoR: false };
+/* 직접 조작 중이면 자동 전진은 손을 뗀다 */
+function manualMove(){ return moveSrc.kbL || moveSrc.kbR || moveSrc.padL || moveSrc.padR; }
 function applyMove(){
-  input.left = moveSrc.kbL || moveSrc.padL;
-  input.right = moveSrc.kbR || moveSrc.padR;
+  input.left = moveSrc.kbL || moveSrc.padL || moveSrc.autoL;
+  input.right = moveSrc.kbR || moveSrc.padR || moveSrc.autoR;
 }
 let padForceRelease = () => {};
 
@@ -1732,6 +1734,7 @@ addEventListener('keyup', e => {
 /* 포커스 이탈 시 키 고착 방지 */
 function resetHeldInput(){
   moveSrc.kbL = moveSrc.kbR = false;
+  moveSrc.autoL = moveSrc.autoR = false;
   padForceRelease();               /* 패드 드래그·knob 시각 상태까지 해제 */
   applyMove();
   input.punch = false;
@@ -4150,16 +4153,17 @@ function doQuake(){
   SND.bigBoom(); SND.land();
   popup(H.x, GROUND - hulkH() - 60, 'EARTHQUAKE!!', 40, '#ff8a3c');
 }
-/* ---------- 스킬 자동 사용 (STAGE 5부터) ---------- */
+/* ---------- 자동 진행: 전진 + 스킬 자동 (STAGE 5부터) ---------- */
 const AUTO_STAGE = 5;
 function autoAvailable(){ return G.stage >= AUTO_STAGE; }
 function toggleAuto(){
   if (!autoAvailable()) return;
   G.autoSkill = !G.autoSkill;
   G.autoT = 0;
+  if (!G.autoSkill) { moveSrc.autoL = moveSrc.autoR = false; applyMove(); }
   refreshAutoBtn();
   SND.unlock();
-  popup(H.x, GROUND - hulkH() - 60, G.autoSkill ? '스킬 자동 ON' : '스킬 자동 OFF',
+  popup(H.x, GROUND - hulkH() - 60, G.autoSkill ? '자동 진행 ON' : '자동 진행 OFF',
         30, G.autoSkill ? '#7ce65a' : '#ffd23f');
 }
 function refreshAutoBtn(){
@@ -4193,6 +4197,42 @@ function autoCast(dt){
   if (!ready.length) { G.autoT = 0.2; return; }
   pressQueue.push(pick(ready));
   G.autoT = 0.55;
+}
+/* 목표 바로 앞에서 멈추는 여유 — 벽에 밀착해 '부수고 지나가라!'가 반복되지 않게 */
+const AUTO_GAP = 6;
+/* 지금 다가갈 목표: 보스 > 아직 안 부순 사물 중 가장 가까운 것 (없으면 제자리) */
+function autoTarget(){
+  const b = G.boss;
+  if (b && b.hp > 0 && b.state !== 'dying') {
+    /* 보스 몸통 + 헐크 반폭 + 여유 = 주먹이 닿는 거리 */
+    const stand = b.w / 2 + hulkW() / 2 + 26;
+    return b.x >= H.x ? { x: b.x - stand, dir: 1 } : { x: b.x + stand, dir: -1 };
+  }
+  /* 사물은 전진 차단선(gate)까지 — 거기서 주먹·스킬이 충분히 닿는다 */
+  const margin = hulkW() * 0.34;
+  let best = null, bestD = Infinity;
+  for (const o of G.objects) {
+    if (o.hp <= 0 || o.dead) continue;
+    const ahead = o.x - margin >= H.x;
+    const tx = ahead ? o.x - margin - AUTO_GAP : o.x + o.w + margin + AUTO_GAP;
+    const d = Math.abs(tx - H.x);
+    if (d < bestD) { bestD = d; best = { x: tx, dir: ahead ? 1 : -1 }; }
+  }
+  return best;
+}
+/* 자동 ON이면 오른쪽 버튼 없이 스스로 목표까지 걸어간다 */
+function autoWalk(){
+  moveSrc.autoL = moveSrc.autoR = false;
+  if (G.autoSkill && autoAvailable() && G.state === 'play' && !manualMove()) {
+    const t = autoTarget();
+    if (t) {
+      if (t.dir > 0 && H.x < t.x) moveSrc.autoR = true;
+      else if (t.dir < 0 && H.x > t.x) moveSrc.autoL = true;
+      /* 다 왔으면 걸음은 멈추되 목표 쪽은 계속 바라본다 (등지고 때리지 않게) */
+      else if (H.onGround && !H.slam && H.dashT <= 0 && H.clapT <= 0) H.face = t.dir;
+    }
+  }
+  applyMove();
 }
 /* 낙뢰 폭풍 (STAGE 6 해제): 하늘에서 번개가 헐크를 중심으로 화면 전체에 연쇄 낙하 */
 function doThunder(){
@@ -4376,6 +4416,7 @@ function update(dt){
   const frameStartX = H.x;   /* 이 프레임의 모든 이동을 검사하기 위한 기준 */
 
   autoCast(dt);
+  autoWalk();
 
   /* 액션 큐 */
   while (pressQueue.length) {
