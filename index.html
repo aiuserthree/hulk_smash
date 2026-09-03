@@ -816,8 +816,12 @@ let viewScale = 1, viewW = 1280;
 let ecoMode = false, frameEma = 16.7, ecoHold = 0;
 
 function resize(){
-  /* 과부하(eco) 상태에선 렌더 해상도를 낮춘다 — 픽셀 수가 절반이 되어 채우기 부담이 크게 준다 */
-  const dpr = Math.min(window.devicePixelRatio || 1, ecoMode ? 1.35 : 2);
+  /* 렌더 해상도 상한. 과부하(eco)면 더 낮춘다 — 픽셀 수가 곧 채우기 부담이다.
+     모바일은 발열·배터리가 걸려 있어 상한을 더 낮게 잡는다. 굵은 외곽선 만화체라
+     2배 → 1.5배로 낮춰도 눈에 잘 띄지 않으면서 채울 픽셀은 44% 줄어든다. */
+  const touch = document.body.classList.contains('touchmode');
+  const cap = touch ? (ecoMode ? 1.15 : 1.5) : (ecoMode ? 1.35 : 2);
+  const dpr = Math.min(window.devicePixelRatio || 1, cap);
   cv.width  = Math.floor(innerWidth * dpr);
   cv.height = Math.floor(innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -857,7 +861,7 @@ function overlayTex(key, draw){
   }
   return o.cv;
 }
-function pCap(){ return ecoMode ? 170 : (lowFx() ? 220 : 280); }
+function pCap(){ return ecoMode ? 140 : (lowFx() ? 180 : 280); }
 /* 광역 사거리 상한 — 헐크가 화면 중앙이므로 화면 반폭 안쪽으로 자른다.
    이게 없으면 고스테이지에서 화면에 보이지도 않는 건물이 부서진다. */
 function aoeCap(v){ return Math.min(v, viewW * 0.46); }
@@ -1758,7 +1762,7 @@ document.addEventListener('visibilitychange', () => {
 
 /* ---------- 터치 ---------- */
 const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
-if (isTouch) document.body.classList.add('touchmode');
+if (isTouch) { document.body.classList.add('touchmode'); resize(); }   /* 모바일 해상도 상한 적용 */
 function bindHold(id, on, off){
   const el = document.getElementById(id);
   el.addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); on(); });
@@ -2409,12 +2413,12 @@ function impact(sec){
 function addFlare(x, y, r, col, life){
   /* 블룸은 가산 블렌딩 원 채우기라 비용이 반경의 제곱으로 는다.
      스킬 반경에 그대로 비례시키면 고스테이지에서 화면을 열몇 번 덧칠해 프레임이 통째로 멈춘다. */
-  G.flares.push({ x, y, r: Math.min(r, viewW * 0.26), col, t: 0, life: life || 0.32 });
-  if (G.flares.length > (ecoMode ? 3 : lowFx() ? 5 : 8)) G.flares.shift();
+  G.flares.push({ x, y, r: Math.min(r, viewW * (lowFx() ? 0.19 : 0.26)), col, t: 0, life: life || 0.32 });
+  if (G.flares.length > (ecoMode ? 2 : lowFx() ? 4 : 8)) G.flares.shift();
 }
 /* 방사형 속도선 (임팩트 순간 뻗어나가는 빛줄기) */
 function addRays(x, y, n, col, len, life){
-  G.rays.push({ x, y, n: Math.min(n, 10), col, len: Math.min(len, viewW * 0.3),
+  G.rays.push({ x, y, n: Math.min(n, lowFx() ? 8 : 10), col, len: Math.min(len, viewW * (lowFx() ? 0.24 : 0.3)),
                 rot: rand(0, 6.3), t: 0, life: life || 0.26 });
   if (G.rays.length > (ecoMode ? 2 : lowFx() ? 4 : 6)) G.rays.shift();
 }
@@ -5405,6 +5409,29 @@ function shade(hex, f){
   return f >= 0 ? mixHex(hex, '#ffffff', f) : mixHex(hex, '#0a0d14', -f);
 }
 let roadPattern = null;
+/* 근경 스카이라인 창문 배치·색을 건물마다 한 번만 계산한다.
+   매 프레임 창마다 sin + 색 문자열을 만들면 화면당 수백 번씩 쌓인다.
+   밝기는 8단계로 묶어 같은 색끼리 한 번에 칠할 수 있게 한다. */
+function skylineWins(b, lit){
+  if (b.wc && b.wcLit === lit) return b.wc;
+  const cols = Math.floor(b.w / 24), rows = Math.floor(b.h / 30);
+  const map = new Map();
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+    const on = (Math.sin(b.x * 7.3 + i * 13.7 + j * 5.1 + b.win * 99) + 1) / 2;
+    let c;
+    if (lit) {
+      if (on <= 0.62) continue;
+      c = 'rgba(255,214,120,' + (0.35 + Math.round(on * 8) / 8 * 0.35).toFixed(3) + ')';
+    } else {
+      c = on > 0.5 ? 'rgba(255,255,255,.14)' : 'rgba(10,15,25,.12)';
+    }
+    let arr = map.get(c);
+    if (!arr) map.set(c, arr = []);
+    arr.push(5 + i * 24, 7 + j * 30);
+  }
+  b.wcLit = lit;
+  return (b.wc = [...map.entries()]);
+}
 
 function render(){
   const W = innerWidth, Hpx = innerHeight;
@@ -5498,19 +5525,12 @@ function render(){
         ctx.fillRect(b.x + b.w * 0.25, GROUND - 40 - b.h - 12, b.w * 0.2, 12);
       }
       if (L === 2) {
-        /* 근경 층 창문 */
-        const cols = Math.floor(b.w / 24), rows = Math.floor(b.h / 30);
-        for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
-          const on = (Math.sin(b.x * 7.3 + i * 13.7 + j * 5.1 + b.win * 99) + 1) / 2;
-          if (t.lit) {
-            if (on > 0.62) {
-              ctx.fillStyle = 'rgba(255,214,120,' + (0.35 + on * 0.35) + ')';
-              ctx.fillRect(b.x + 5 + i * 24, GROUND - 40 - b.h + 7 + j * 30, 9, 12);
-            }
-          } else {
-            ctx.fillStyle = on > 0.5 ? 'rgba(255,255,255,.14)' : 'rgba(10,15,25,.12)';
-            ctx.fillRect(b.x + 5 + i * 24, GROUND - 40 - b.h + 7 + j * 30, 9, 12);
-          }
+        /* 근경 층 창문 — 색이 같은 것끼리 묶어 fillStyle 교체를 창마다 → 색마다로 줄인다 */
+        const wy0 = GROUND - 40 - b.h;
+        for (const grp of skylineWins(b, t.lit)) {
+          ctx.fillStyle = grp[0];
+          const arr = grp[1];
+          for (let k = 0; k < arr.length; k += 2) ctx.fillRect(b.x + arr[k], wy0 + arr[k + 1], 9, 12);
         }
         ctx.fillStyle = col;
       }
@@ -5540,7 +5560,7 @@ function render(){
   ctx.fillStyle = rg2;
   ctx.fillRect(G.camX - 50, GROUND, viewW + 100, VH - GROUND + 60);
   if (!roadPattern) { try { roadPattern = ctx.createPattern(ROAD_TEX, 'repeat'); } catch(e){} }
-  if (roadPattern) {
+  if (roadPattern && !ecoMode) {
     ctx.save();
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = roadPattern;
@@ -6091,13 +6111,9 @@ function render(){
 
   ctx.restore(); /* 뷰스케일 끝 */
 
-  /* 테마 컬러 그레이딩 */
-  if (t.grade) {
-    ctx.fillStyle = t.grade;
-    ctx.fillRect(0, 0, W, Hpx);
-  }
-  /* 비네트 */
-  ctx.drawImage(overlayTex('vig', (c2, w, h) => {
+  /* 테마 컬러 그레이딩 + 비네트 — 한 장에 구워 전체화면 덧칠을 두 번에서 한 번으로 */
+  ctx.drawImage(overlayTex('vig|' + (t.grade || ''), (c2, w, h) => {
+    if (t.grade) { c2.fillStyle = t.grade; c2.fillRect(0, 0, w, h); }
     const g = c2.createRadialGradient(w / 2, h * 0.45, h * 0.5, w / 2, h * 0.55, h * 0.95);
     g.addColorStop(0, 'rgba(0,0,0,0)');
     g.addColorStop(1, 'rgba(8,10,18,.24)');
@@ -6586,41 +6602,51 @@ function drawObject(o){
         ctx.fillStyle = '#5a616e';
         ctx.fillRect(x + w * 0.6, top - 16, 4, 10);
       }
-      /* 창문 */
+      /* 창문 — 한 줄은 y가 같으니 그라데이션도 줄마다 하나면 된다.
+         창마다 만들면 화면에 보이는 건물 수만큼 프레임당 수십 개가 쌓인다. */
       const cols = Math.max(2, Math.floor(w / 38));
       const rows = Math.max(2, Math.floor(h / 52));
       const litSeed = o.seed * 97;
-      for (let i = 0; i < cols; i++) {
-        for (let j = 0; j < rows; j++) {
-          const wx = x + 10 + i * ((w - 20) / cols) + 2;
-          const wy = top + 14 + j * ((h - 24) / rows);
-          const ww2 = (w - 20) / cols - 8;
-          const wh = Math.min(26, (h - 24) / rows - 10);
-          const lit = G.theme.lit && ((Math.sin(litSeed + i * 7.7 + j * 3.1) + 1) / 2 > 0.5);
-          /* 창틀 그림자 */
-          ctx.fillStyle = 'rgba(10,12,20,.3)';
-          ctx.fillRect(wx - 1.5, wy - 1.5, ww2 + 3, wh + 3);
-          if (lit) {
-            const lg2 = ctx.createLinearGradient(0, wy, 0, wy + wh);
-            lg2.addColorStop(0, '#ffe9a8');
-            lg2.addColorStop(1, '#e0a94e');
-            ctx.fillStyle = lg2;
+      const wpitch = (w - 20) / cols, ww2 = wpitch - 8;
+      const night = G.theme.lit;
+      for (let j = 0; j < rows; j++) {
+        const wy = top + 14 + j * ((h - 24) / rows);
+        const wh = Math.min(26, (h - 24) / rows - 10);
+        /* 창틀 그림자: 줄 단위로 한 번에 */
+        ctx.fillStyle = 'rgba(10,12,20,.3)';
+        for (let i = 0; i < cols; i++) ctx.fillRect(x + 12 + i * wpitch - 1.5, wy - 1.5, ww2 + 3, wh + 3);
+        let gLit = null, gDark = null;
+        for (let i = 0; i < cols; i++) {
+          const wx = x + 12 + i * wpitch;
+          if (night && (Math.sin(litSeed + i * 7.7 + j * 3.1) + 1) / 2 > 0.5) {
+            if (!gLit) {
+              gLit = ctx.createLinearGradient(0, wy, 0, wy + wh);
+              gLit.addColorStop(0, '#ffe9a8');
+              gLit.addColorStop(1, '#e0a94e');
+            }
+            ctx.fillStyle = gLit;
           } else {
-            const gl2 = ctx.createLinearGradient(0, wy, 0, wy + wh);
-            gl2.addColorStop(0, G.theme.lit ? '#232840' : '#cfe0ea');
-            gl2.addColorStop(1, G.theme.lit ? '#161a2c' : '#93aebc');
-            ctx.fillStyle = gl2;
+            if (!gDark) {
+              gDark = ctx.createLinearGradient(0, wy, 0, wy + wh);
+              gDark.addColorStop(0, night ? '#232840' : '#cfe0ea');
+              gDark.addColorStop(1, night ? '#161a2c' : '#93aebc');
+            }
+            ctx.fillStyle = gDark;
           }
           ctx.fillRect(wx, wy, ww2, wh);
-          if (!G.theme.lit) {
-            ctx.fillStyle = 'rgba(255,255,255,.35)';
-            ctx.beginPath();
+        }
+        /* 유리 반사 하이라이트: 한 줄을 한 번의 path로 */
+        if (!night) {
+          ctx.fillStyle = 'rgba(255,255,255,.35)';
+          ctx.beginPath();
+          for (let i = 0; i < cols; i++) {
+            const wx = x + 12 + i * wpitch;
             ctx.moveTo(wx, wy);
             ctx.lineTo(wx + ww2 * 0.45, wy);
             ctx.lineTo(wx + ww2 * 0.15, wy + wh);
             ctx.lineTo(wx, wy + wh);
-            ctx.fill();
           }
+          ctx.fill();
         }
       }
       /* 입구 */
@@ -8703,12 +8729,22 @@ function drawHulk(){
 
 /* ---------- 메인 루프 ---------- */
 let lastT = performance.now();
+/* 프레임 상한 — 발열·배터리의 가장 큰 변수다.
+   120Hz 화면은 그냥 두면 초당 120번을 그려 60Hz 대비 두 배로 뜨거워진다.
+   60Hz 화면에서 한 프레임도 놓치지 않도록 문턱은 목표 간격(16.7ms)보다 낮게 잡는다.
+   플레이 중이 아닌 화면(시작·일시정지·클리어)은 볼 게 거의 없으니 확 낮춘다. */
+function frameGate(){
+  return (G.state === 'play' || G.state === 'clearing' || G.state === 'defeat') ? 13.5 : 45;
+}
 function loop(now){
+  if (now - lastT < frameGate()) { requestAnimationFrame(loop); return; }
   const rawDt = Math.min((now - lastT) / 1000, 0.033);
   const frameMs = now - lastT;
+  const active = G.state === 'play' || G.state === 'clearing' || G.state === 'defeat';
   lastT = now;
-  /* 실제 프레임 간격을 지수이동평균으로 보고 저사양·과부하 상황을 감지 */
-  if (frameMs > 0 && frameMs < 120 && document.visibilityState === 'visible') {
+  /* 실제 프레임 간격을 지수이동평균으로 보고 저사양·과부하 상황을 감지
+     (프레임을 일부러 늦추는 메뉴 화면은 제외 — 안 그러면 멀쩡한 기기도 eco로 떨어진다) */
+  if (active && frameMs > 0 && frameMs < 120 && document.visibilityState === 'visible') {
     frameEma += (frameMs - frameEma) * 0.05;
     if (!ecoMode) {
       ecoHold = frameEma > 19.5 ? ecoHold + 1 : Math.max(0, ecoHold - 2);
