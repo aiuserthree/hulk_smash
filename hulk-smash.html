@@ -2297,6 +2297,7 @@ function refreshStartScreen(){
   }
 }
 function beginStage(n){
+  stopNextAuto();
   ui.startOv.classList.remove('on');
   ui.clearOv.classList.remove('on');
   ui.hud.classList.add('on');
@@ -5261,6 +5262,27 @@ function countUp(el, target, dur, fmt){
   };
   requestAnimationFrame(step);
 }
+/* 클리어 화면: 5초 뒤 다음 스테이지로 자동 진행.
+   남은 초를 버튼에 띄워 저절로 넘어가는 게 아니라 기다리는 중임을 보여준다.
+   (보스 보상 선택 화면은 카드를 골라야 진행되므로 대상이 아니다) */
+const NEXT_AUTO_SEC = 5;
+let nextAutoT = null;
+function stopNextAuto(){
+  if (nextAutoT) { clearInterval(nextAutoT); nextAutoT = null; }
+}
+function startNextAuto(){
+  stopNextAuto();
+  const base = ui.nextBtn.textContent;
+  let left = NEXT_AUTO_SEC;
+  const paint = () => { ui.nextBtn.textContent = base + ' (' + left + ')'; };
+  paint();
+  nextAutoT = setInterval(() => {
+    /* 클리어 화면을 벗어났으면 조용히 멈춘다 */
+    if (G.state !== 'clear' || ui.nextBtn.style.display === 'none') { stopNextAuto(); return; }
+    if (--left <= 0) { stopNextAuto(); nextStage(); return; }
+    paint();
+  }, 1000);
+}
 function showClear(){
   G.state = 'clear';
   SND.fanfare();
@@ -5377,6 +5399,7 @@ function showClear(){
   /* 영구 기록 갱신 */
   bumpRecords();
   ui.clearOv.classList.add('on');
+  if (ui.nextBtn.style.display !== 'none') startNextAuto();
 }
 
 /* ============================================================
